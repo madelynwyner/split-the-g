@@ -120,15 +120,7 @@ async function processImage() {
         const analysis = analyzeBeerLevel(data, canvas.width, canvas.height);
         window.lastAnalysis = analysis; // Store for use in drawPercentageOverlay
         
-        // Calculate score based on how close to 3/4 the level is
-        const targetLevel = 0.75; // 3/4 of the glass
-        const score = calculateScore(analysis.beerLevel, targetLevel);
-        
-        // Update percentages
-        const beerPercentage = Math.round(analysis.beerLevel * 100);
-        const emptyPercentage = 100 - beerPercentage;
-        
-        // Draw debug visualization with glass boundaries
+        // Draw debug visualization with glass boundaries first
         drawDebugVisualization(
             analysis.debugData,
             analysis.glassTop,
@@ -138,10 +130,21 @@ async function processImage() {
             analysis.rightRimTop
         );
         
-        // Draw target line and G marker first
+        // Draw target line and G marker
         drawTargetLine();
         
-        // Then draw the percentage brackets and text
+        // Calculate target position (67% up from bottom)
+        const glassHeight = analysis.glassBottom - analysis.glassTop;
+        const targetY = analysis.glassBottom - (glassHeight * 0.67);
+        
+        // Calculate score based on how close liquid level is to G line
+        const score = calculateScore(analysis.liquidLevel, targetY);
+        
+        // Update percentages
+        const beerPercentage = Math.round(analysis.beerLevel * 100);
+        const emptyPercentage = 100 - beerPercentage;
+        
+        // Draw the percentage brackets and text
         drawPercentageOverlay(beerPercentage, emptyPercentage);
         
         // Finally update the score display
@@ -158,24 +161,6 @@ async function processImage() {
 
 // Function to draw debug visualization
 function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, leftRimTop, rightRimTop) {
-    // Draw the sampling area
-    const startX = Math.floor(canvas.width * 0.33);
-    const endX = Math.floor(canvas.width * 0.66);
-    
-    // Draw vertical lines showing sampling area
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-    ctx.lineWidth = 2;
-    
-    // Left boundary
-    ctx.moveTo(startX, 0);
-    ctx.lineTo(startX, canvas.height);
-    
-    // Right boundary
-    ctx.moveTo(endX, 0);
-    ctx.lineTo(endX, canvas.height);
-    ctx.stroke();
-    
     // Draw both rim positions with full opacity
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(0, 255, 255, 1)'; // Full opacity cyan
@@ -193,16 +178,16 @@ function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, l
     // Bottom line
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(0, 255, 255, 1)';
-    ctx.moveTo(startX - 20, glassBottom);
-    ctx.lineTo(endX + 20, glassBottom);
+    ctx.moveTo(Math.floor(canvas.width * 0.2), glassBottom);
+    ctx.lineTo(Math.floor(canvas.width * 0.8), glassBottom);
     ctx.stroke();
     
     // Draw liquid level line
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)';
     ctx.lineWidth = 2;
-    ctx.moveTo(startX - 20, liquidLevel);
-    ctx.lineTo(endX + 20, liquidLevel);
+    ctx.moveTo(Math.floor(canvas.width * 0.2), liquidLevel);
+    ctx.lineTo(Math.floor(canvas.width * 0.8), liquidLevel);
     ctx.stroke();
     
     // Draw detection points
@@ -211,7 +196,7 @@ function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, l
         const intensity = debugData[y];
         if (intensity > 0.1) {
             ctx.fillStyle = `rgba(255, 0, 0, ${intensity})`;
-            ctx.fillRect(endX + 5, y - pointWidth/2, 20, pointWidth);
+            ctx.fillRect(canvas.width - 25, y - pointWidth/2, 20, pointWidth);
         }
     }
 }
@@ -282,13 +267,13 @@ function drawTargetLine() {
     const { glassTop, glassBottom } = window.lastAnalysis || {};
     if (!glassTop || !glassBottom) return;
     
-    // Calculate target Y position (60% up from bottom between glass edges)
+    // Calculate target Y position (67% up from bottom between glass edges)
     const glassHeight = glassBottom - glassTop;
-    const targetY = glassBottom - (glassHeight * 0.60);
+    const targetY = glassBottom - (glassHeight * 0.67);
     
     // Draw line with slightly increased opacity
     ctx.beginPath();
-    ctx.moveTo(0, targetY);
+    ctx.moveTo(Math.floor(canvas.width * 0.2), targetY);
     ctx.lineTo(canvas.width - 60, targetY);
     ctx.strokeStyle = 'rgba(224, 184, 119, 0.9)'; // #e0b877 with higher opacity
     ctx.lineWidth = 3; // Slightly thicker line
@@ -599,12 +584,15 @@ function analyzeBeerLevel(imageData, width, height) {
     };
 }
 
-// Calculate score based on how close the level is to target
-function calculateScore(actualLevel, targetLevel) {
-    const difference = Math.abs(actualLevel - targetLevel);
+// Calculate score based on how close the liquid level is to target line
+function calculateScore(actualY, targetY) {
+    // Convert pixel difference to a percentage of glass height
+    const pixelDifference = Math.abs(actualY - targetY);
+    const maxAllowedDifference = 50; // Maximum pixel difference for scoring
+    
     // Convert to a 0-100 score, with 100 being perfect
-    const score = Math.max(0, 100 - (difference * 200));
-    return Math.round(score * 100) / 100;
+    const score = Math.max(0, 100 - ((pixelDifference / maxAllowedDifference) * 100));
+    return Math.round(score);
 }
 
 // Display results to user
