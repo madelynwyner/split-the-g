@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split the G - Guinness Level Analyzer</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.15.0"></script>
+    <!-- TensorFlow.js for computer vision -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/image-segmentation"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>Split the G</h1>
+        <p class="subtitle">Test your Guinness splitting skills!</p>
+        
+        <div class="camera-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas" class="preview-canvas" style="display: none;"></canvas>
+            
+            <div class="controls">
+                <button id="captureBtn" class="btn" disabled>Take Photo</button>
+                <div class="upload-container">
+                    <label for="fileInput" class="btn">Upload Photo</label>
+                    <input type="file" id="fileInput" accept="image/*" capture="environment">
+                </div>
+            </div>
+        </div>
+
+        <div id="result" class="result-container" style="display: none;">
+            <h2>Your Score</h2>
+            <div class="score-display">
+                <span id="score">0.00</span>
+            </div>
+            <p id="feedback"></p>
+            <button id="tryAgainBtn" class="btn">Try Again</button>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

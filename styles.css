@@ -1,0 +1,131 @@
+:root {
+    --primary-color: #1b1b1b;
+    --secondary-color: #e0b877;
+    --text-color: #ffffff;
+    --accent-color: #964b00;
+    --success-color: #2ecc71;
+    --error-color: #e74c3c;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--primary-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 2rem;
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: var(--secondary-color);
+    margin-bottom: 0.5rem;
+}
+
+.subtitle {
+    color: #888;
+    margin-bottom: 2rem;
+}
+
+.camera-container {
+    background: #2d2d2d;
+    padding: 1rem;
+    border-radius: 10px;
+    margin-bottom: 2rem;
+    position: relative;
+}
+
+#video {
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    border-radius: 5px;
+    background: #1a1a1a;
+    transform: scaleX(-1); /* Mirror the video for selfie mode */
+}
+
+.preview-canvas {
+    width: 100%;
+    max-width: 640px;
+    height: auto;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+    background: #1a1a1a;
+}
+
+.controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.btn {
+    background-color: var(--secondary-color);
+    color: var(--primary-color);
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn:hover:not(:disabled) {
+    background-color: #c9a05c;
+    transform: translateY(-2px);
+}
+
+#fileInput {
+    display: none;
+}
+
+.result-container {
+    background: #2d2d2d;
+    padding: 2rem;
+    border-radius: 10px;
+    margin-top: 2rem;
+}
+
+.score-display {
+    font-size: 4rem;
+    font-weight: bold;
+    color: var(--secondary-color);
+    margin: 1rem 0;
+}
+
+#feedback {
+    color: #888;
+    margin-bottom: 1rem;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    .controls {
+        flex-direction: column;
+    }
+    
+    .btn {
+        width: 100%;
+    }
+}
