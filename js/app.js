@@ -103,6 +103,9 @@ async function initCamera() {
 // Function to start real-time analysis
 function startRealTimeAnalysis() {
     isAnalyzing = true;
+    // Make sure canvas is visible during analysis
+    canvas.style.display = 'block';
+    video.style.display = 'none';
     requestAnimationFrame(analyzeFrame);
 }
 
@@ -112,77 +115,66 @@ function analyzeFrame() {
     
     const now = Date.now();
     if (now - lastAnalysisTime >= analysisInterval) {
-        // Draw current frame to canvas
+        // Create a temporary canvas for analysis
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvasWidth;
         tempCanvas.height = canvasHeight;
         const tempCtx = tempCanvas.getContext('2d');
+        
+        // Draw the current video frame to both canvases
         tempCtx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
         
         // Analyze the frame
         const imageData = tempCtx.getImageData(0, 0, canvasWidth, canvasHeight);
         const analysis = analyzeBeerLevel(imageData.data, canvasWidth, canvasHeight);
         
-        // Draw alignment visualization on video
-        drawAlignmentVisualization(analysis);
+        // Draw rim lines on main canvas
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(0, 255, 255, 1)';
+        ctx.lineWidth = 2;
         
-        // Check if glass is aligned
+        // Front rim (lower)
+        ctx.moveTo(Math.floor(canvasWidth * 0.2), Math.max(analysis.leftRimTop, analysis.rightRimTop));
+        ctx.lineTo(Math.floor(canvasWidth * 0.8), Math.max(analysis.leftRimTop, analysis.rightRimTop));
+        
+        // Back rim (higher)
+        ctx.moveTo(Math.floor(canvasWidth * 0.2), Math.min(analysis.leftRimTop, analysis.rightRimTop));
+        ctx.lineTo(Math.floor(canvasWidth * 0.8), Math.min(analysis.leftRimTop, analysis.rightRimTop));
+        ctx.stroke();
+        
+        // Calculate rim difference and show guidance
         const rimDifference = Math.abs(analysis.leftRimTop - analysis.rightRimTop);
-        if (rimDifference < 10) { // If rims are within 10 pixels of each other
-            // Auto capture
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        
+        // Add a black outline to text for better visibility
+        ctx.strokeStyle = 'black';
+        ctx.lineWidth = 3;
+        let text = '';
+        
+        if (rimDifference > 20) {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            text = 'Keep tilting...';
+        } else if (rimDifference > 10) {
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.9)';
+            text = 'Almost even...';
+        } else {
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.9)';
+            text = 'Perfect! Capturing...';
+            // Auto capture when rim is even
             captureAndAnalyze();
             return;
         }
+        
+        // Draw text with outline
+        ctx.strokeText(text, canvasWidth/2, 50);
+        ctx.fillText(text, canvasWidth/2, 50);
         
         lastAnalysisTime = now;
     }
     
     requestAnimationFrame(analyzeFrame);
-}
-
-// Function to draw alignment visualization
-function drawAlignmentVisualization(analysis) {
-    const alignmentCanvas = document.createElement('canvas');
-    alignmentCanvas.width = canvasWidth;
-    alignmentCanvas.height = canvasHeight;
-    const alignCtx = alignmentCanvas.getContext('2d');
-    
-    // Draw the current video frame
-    alignCtx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
-    
-    // Draw rim lines
-    alignCtx.beginPath();
-    alignCtx.strokeStyle = 'rgba(0, 255, 255, 1)';
-    alignCtx.lineWidth = 2;
-    
-    // Front rim (lower)
-    alignCtx.moveTo(Math.floor(canvasWidth * 0.2), Math.max(analysis.leftRimTop, analysis.rightRimTop));
-    alignCtx.lineTo(Math.floor(canvasWidth * 0.8), Math.max(analysis.leftRimTop, analysis.rightRimTop));
-    
-    // Back rim (higher)
-    alignCtx.moveTo(Math.floor(canvasWidth * 0.2), Math.min(analysis.leftRimTop, analysis.rightRimTop));
-    alignCtx.lineTo(Math.floor(canvasWidth * 0.8), Math.min(analysis.leftRimTop, analysis.rightRimTop));
-    alignCtx.stroke();
-    
-    // Calculate rim difference and show guidance
-    const rimDifference = Math.abs(analysis.leftRimTop - analysis.rightRimTop);
-    alignCtx.font = 'bold 24px Arial';
-    alignCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    alignCtx.textAlign = 'center';
-    
-    if (rimDifference > 20) {
-        alignCtx.fillText('Tilt the glass to align the blue lines', canvasWidth/2, 50);
-    } else if (rimDifference > 10) {
-        alignCtx.fillStyle = 'rgba(255, 255, 0, 0.8)';
-        alignCtx.fillText('Almost there...', canvasWidth/2, 50);
-    } else {
-        alignCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
-        alignCtx.fillText('Perfect! Capturing...', canvasWidth/2, 50);
-    }
-    
-    // Update the video display with the visualization
-    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-    ctx.drawImage(alignmentCanvas, 0, 0);
 }
 
 // Function to capture and analyze the frame
@@ -705,9 +697,9 @@ function displayResults(score) {
 // Try again button handler
 tryAgainBtn.addEventListener('click', () => {
     resultDiv.style.display = 'none';
-    canvas.style.display = 'none';
-    video.style.display = 'block';
-    captureBtn.style.display = 'block'; // Show capture button again
+    // Reset analysis state
+    isAnalyzing = true;
+    requestAnimationFrame(analyzeFrame);
 });
 
 // Initialize
