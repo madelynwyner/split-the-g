@@ -16,6 +16,15 @@ let stream = null;
 let canvasWidth = 640;
 let canvasHeight = 480;
 
+// Define analysis regions (matching guide outline)
+const analysisRegions = {
+    left: 0.2,    // 20% from left
+    right: 0.8,   // 80% from left
+    top: 0.1,     // 10% from top
+    bottom: 0.9,  // 90% from top
+    targetY: 0.5  // Arrow position (50% from top)
+};
+
 // Function to resize canvas while maintaining aspect ratio
 function resizeCanvas() {
     const containerWidth = video.offsetWidth;
@@ -278,13 +287,12 @@ function drawTargetLine() {
     const { glassTop, glassBottom } = window.lastAnalysis || {};
     if (!glassTop || !glassBottom) return;
     
-    // Calculate target Y position (67% up from bottom between glass edges)
-    const glassHeight = glassBottom - glassTop;
-    const targetY = glassBottom - (glassHeight * 0.67);
+    // Calculate target Y position (matching the arrow position)
+    const targetY = Math.floor(canvas.height * analysisRegions.targetY);
     
     // Draw line with slightly increased opacity
     ctx.beginPath();
-    ctx.moveTo(Math.floor(canvas.width * 0.2), targetY);
+    ctx.moveTo(Math.floor(canvas.width * analysisRegions.left), targetY);
     ctx.lineTo(canvas.width - 60, targetY);
     ctx.strokeStyle = 'rgba(224, 184, 119, 0.9)'; // #e0b877 with higher opacity
     ctx.lineWidth = 3; // Slightly thicker line
@@ -314,19 +322,24 @@ function analyzeBeerLevel(imageData, width, height) {
     let rightEdgeIntensity = new Array(height).fill(0);
     let liquidTransitionByRow = new Array(height).fill(0);
     
-    // Sample the middle third of the image width for liquid detection
-    const startX = Math.floor(width * 0.33);
-    const endX = Math.floor(width * 0.66);
+    // Sample the middle third of the guide area for liquid detection
+    const guideWidth = (analysisRegions.right - analysisRegions.left) * width;
+    const startX = Math.floor(width * analysisRegions.left + guideWidth * 0.33);
+    const endX = Math.floor(width * analysisRegions.left + guideWidth * 0.66);
     const sampleWidth = endX - startX;
     
     // Define regions for left and right rim detection
-    const leftRegionStart = Math.floor(width * 0.2);
-    const leftRegionEnd = Math.floor(width * 0.4);
-    const rightRegionStart = Math.floor(width * 0.6);
-    const rightRegionEnd = Math.floor(width * 0.8);
+    const leftRegionStart = Math.floor(width * analysisRegions.left);
+    const leftRegionEnd = Math.floor(width * (analysisRegions.left + 0.1));
+    const rightRegionStart = Math.floor(width * (analysisRegions.right - 0.1));
+    const rightRegionEnd = Math.floor(width * analysisRegions.right);
+    
+    // Analysis boundaries
+    const startY = Math.floor(height * analysisRegions.top);
+    const endY = Math.floor(height * analysisRegions.bottom);
     
     // First pass: detect edges and potential liquid boundaries
-    for (let y = 1; y < height - 1; y++) {
+    for (let y = startY + 1; y < endY - 1; y++) {
         // Scan left region for left rim
         for (let x = leftRegionStart; x < leftRegionEnd; x++) {
             const idx = (y * width + x) * 4;
@@ -389,14 +402,15 @@ function analyzeBeerLevel(imageData, width, height) {
     }
     
     // Find left and right rim positions
-    let leftRimTop = height * 0.25;
-    let rightRimTop = height * 0.25;
+    let leftRimTop = height * analysisRegions.top;
+    let rightRimTop = height * analysisRegions.top;
     let leftTopEdges = [];
     let rightTopEdges = [];
     
-    // Detect significant edges in the top half for both sides
+    // Detect significant edges in the top portion of the guide area
     const minEdgeStrength = 0.15;
-    for (let y = Math.floor(height * 0.05); y < Math.floor(height * 0.5); y++) {
+    const topSearchLimit = height * (analysisRegions.top + (analysisRegions.bottom - analysisRegions.top) * 0.3);
+    for (let y = Math.floor(height * analysisRegions.top); y < topSearchLimit; y++) {
         if (leftEdgeIntensity[y] > minEdgeStrength) {
             leftTopEdges.push({
                 position: y,
