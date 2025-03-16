@@ -147,10 +147,10 @@ async function processImage() {
         );
         
         // Draw target line and G marker
-        drawTargetLine();
+        const targetY = Math.floor(canvas.height * analysisRegions.targetY);
+        drawTargetLine(targetY);
         
         // Calculate score based on how close liquid level is to G line
-        const targetY = Math.floor(canvas.height * analysisRegions.targetY);
         const score = calculateScore(analysis.liquidLevel, targetY);
         
         // Update percentages
@@ -276,14 +276,7 @@ function drawPercentageOverlay(beerPercentage, emptyPercentage) {
 }
 
 // Draw target line and G marker
-function drawTargetLine() {
-    // Get the glass boundaries from the last analysis
-    const { glassTop, glassBottom } = window.lastAnalysis || {};
-    if (!glassTop || !glassBottom) return;
-    
-    // Calculate target Y position (matching the arrow position)
-    const targetY = Math.floor(canvas.height * analysisRegions.targetY);
-    
+function drawTargetLine(targetY) {
     // Draw line with slightly increased opacity
     ctx.beginPath();
     ctx.moveTo(Math.floor(canvas.width * analysisRegions.left), targetY);
@@ -548,17 +541,23 @@ function analyzeBeerLevel(imageData, width, height) {
 }
 
 // Calculate score based on how close the liquid level is to target line
-function calculateScore(actualY, targetY) {
+function calculateScore(liquidLevel, targetY) {
     // Calculate the pixel difference between liquid level and G line
-    const pixelDifference = Math.abs(actualY - targetY);
+    const pixelDifference = Math.abs(liquidLevel - targetY);
     
     // Maximum allowed difference (in pixels) for scoring
     // Smaller value = more strict scoring
-    const maxAllowedDifference = 30; // Adjusted to be more strict
+    const maxAllowedDifference = 20; // More strict scoring
     
     // Calculate score as percentage of accuracy
     // The closer to the G line, the higher the score
     const score = Math.max(0, 100 - ((pixelDifference / maxAllowedDifference) * 100));
+    
+    // For debugging
+    console.log('Liquid Level:', liquidLevel);
+    console.log('Target Y:', targetY);
+    console.log('Pixel Difference:', pixelDifference);
+    console.log('Score:', score);
     
     // Round to nearest integer
     return Math.round(score);
