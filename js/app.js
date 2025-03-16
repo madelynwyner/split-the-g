@@ -554,13 +554,21 @@ function calculateScore(liquidLevel, targetY) {
     // Calculate how far off from 60% we are
     const percentageDifference = Math.abs(beerPercentage - 60);
     
-    // Maximum allowed difference for scoring
-    // Smaller value = more strict scoring
-    const maxAllowedDifference = 5; // Very strict: only 5% difference allowed for scoring
-    
-    // Calculate score as percentage of accuracy
-    // The closer to 60%, the higher the score
-    const score = Math.max(0, 100 - ((percentageDifference / maxAllowedDifference) * 100));
+    // New scoring algorithm with more forgiving scale
+    let score;
+    if (percentageDifference <= 2) {
+        // 58-62%: Very high scores (95-100%)
+        score = 100 - (percentageDifference * 2.5); // Each 1% off reduces score by 2.5
+    } else if (percentageDifference <= 5) {
+        // 55-65%: High scores (90-95%)
+        score = 95 - ((percentageDifference - 2) * 1.67); // Each 1% off reduces score by ~1.67
+    } else if (percentageDifference <= 10) {
+        // 50-70%: Good scores (80-90%)
+        score = 90 - ((percentageDifference - 5) * 2); // Each 1% off reduces score by 2
+    } else {
+        // Beyond 10% difference: rapidly decreasing scores
+        score = Math.max(0, 80 - ((percentageDifference - 10) * 4)); // Each 1% off reduces score by 4
+    }
     
     // For debugging
     console.log('Beer Percentage:', beerPercentage + '%');
