@@ -117,7 +117,7 @@ async function processImage() {
         const data = imageData.data;
         
         // Find the beer level using color analysis
-        const { beerLevel, debugData } = analyzeBeerLevel(data, canvas.width, canvas.height);
+        const { beerLevel, debugData, glassTop, glassBottom, liquidLevel } = analyzeBeerLevel(data, canvas.width, canvas.height);
         
         // Calculate score based on how close to 3/4 the level is
         const targetLevel = 0.75; // 3/4 of the glass
@@ -127,8 +127,8 @@ async function processImage() {
         const beerPercentage = Math.round(beerLevel * 100);
         const emptyPercentage = 100 - beerPercentage;
         
-        // Draw debug visualization
-        drawDebugVisualization(debugData);
+        // Draw debug visualization with glass boundaries
+        drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel);
         
         // Draw target line and G marker first
         drawTargetLine();
@@ -146,7 +146,7 @@ async function processImage() {
 }
 
 // Function to draw debug visualization
-function drawDebugVisualization(debugData) {
+function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel) {
     // Draw the sampling area
     const startX = Math.floor(canvas.width * 0.33);
     const endX = Math.floor(canvas.width * 0.66);
@@ -165,12 +165,34 @@ function drawDebugVisualization(debugData) {
     ctx.lineTo(endX, canvas.height);
     ctx.stroke();
     
+    // Draw glass top and bottom lines
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+    ctx.lineWidth = 2;
+    
+    // Top line
+    ctx.moveTo(startX - 20, glassTop);
+    ctx.lineTo(endX + 20, glassTop);
+    
+    // Bottom line
+    ctx.moveTo(startX - 20, glassBottom);
+    ctx.lineTo(endX + 20, glassBottom);
+    ctx.stroke();
+    
+    // Draw liquid level line
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.moveTo(startX - 20, liquidLevel);
+    ctx.lineTo(endX + 20, liquidLevel);
+    ctx.stroke();
+    
     // Draw detection points
     const pointWidth = 3;
     for (let y = 0; y < canvas.height; y++) {
-        const darkness = debugData[y];
-        if (darkness > 0.5) { // Only show strong dark pixel detections
-            ctx.fillStyle = `rgba(255, 0, 0, ${darkness})`;
+        const intensity = debugData[y];
+        if (intensity > 0.1) {
+            ctx.fillStyle = `rgba(255, 0, 0, ${intensity})`;
             ctx.fillRect(endX + 5, y - pointWidth/2, 20, pointWidth);
         }
     }
@@ -248,58 +270,105 @@ function drawTargetLine() {
 // Analyze the beer level in the image
 function analyzeBeerLevel(imageData, width, height) {
     const debugData = new Array(height).fill(0);
-    let darkPixelsByRow = new Array(height).fill(0);
+    let edgeIntensityByRow = new Array(height).fill(0);
+    let liquidTransitionByRow = new Array(height).fill(0);
     
     // Sample the middle third of the image width
     const startX = Math.floor(width * 0.33);
     const endX = Math.floor(width * 0.66);
     const sampleWidth = endX - startX;
     
-    // Count dark pixels in each row
-    for (let y = 0; y < height; y++) {
+    // First pass: detect edges and potential liquid boundaries
+    for (let y = 1; y < height - 1; y++) {
         for (let x = startX; x < endX; x++) {
             const idx = (y * width + x) * 4;
+            const idxAbove = ((y - 1) * width + x) * 4;
+            const idxBelow = ((y + 1) * width + x) * 4;
+            
+            // Get RGB values for current pixel and neighbors
             const r = imageData[idx];
             const g = imageData[idx + 1];
             const b = imageData[idx + 2];
             
-            // Detect dark pixels (Guinness is very dark)
-            // Adjusted threshold for better detection
-            if (r < 80 && g < 80 && b < 80 && 
-                Math.max(r, g, b) - Math.min(r, g, b) < 30) { // Check for true darkness
-                darkPixelsByRow[y]++;
-            }
+            const rAbove = imageData[idxAbove];
+            const gAbove = imageData[idxAbove + 1];
+            const bAbove = imageData[idxAbove + 2];
+            
+            const rBelow = imageData[idxBelow];
+            const gBelow = imageData[idxBelow + 1];
+            const bBelow = imageData[idxBelow + 2];
+            
+            // Calculate brightness
+            const brightness = (r + g + b) / 3;
+            const brightnessAbove = (rAbove + gAbove + bAbove) / 3;
+            const brightnessBelow = (rBelow + gBelow + bBelow) / 3;
+            
+            // Detect vertical edges (glass sides)
+            const verticalEdge = Math.abs(brightness - brightnessAbove) + 
+                               Math.abs(brightness - brightnessBelow);
+            
+            // Detect color/brightness transitions (liquid level)
+            const colorDiff = Math.abs(brightnessAbove - brightnessBelow);
+            
+            edgeIntensityByRow[y] += verticalEdge > 30 ? 1 : 0;
+            liquidTransitionByRow[y] += colorDiff > 20 ? 1 : 0;
         }
-        // Convert to percentage
-        darkPixelsByRow[y] = darkPixelsByRow[y] / sampleWidth;
-        debugData[y] = darkPixelsByRow[y];
+        
+        // Normalize values
+        edgeIntensityByRow[y] /= sampleWidth;
+        liquidTransitionByRow[y] /= sampleWidth;
+        debugData[y] = liquidTransitionByRow[y];
     }
     
-    // Find the transition point (beer level)
-    let maxTransition = 0;
-    let transitionPoint = height * 0.75; // Default to 3/4 if no clear transition
+    // Find glass top and bottom
+    let glassTop = height * 0.25;
+    let glassBottom = height * 0.75;
+    let maxEdgeStrength = 0;
     
-    // Use a larger window for smoother detection
-    const windowSize = 20;
-    for (let y = windowSize; y < height - windowSize; y++) {
-        const above = darkPixelsByRow.slice(y - windowSize, y).reduce((a, b) => a + b) / windowSize;
-        const below = darkPixelsByRow.slice(y, y + windowSize).reduce((a, b) => a + b) / windowSize;
+    // Look for strong horizontal edges in the top third
+    for (let y = Math.floor(height * 0.1); y < Math.floor(height * 0.4); y++) {
+        if (edgeIntensityByRow[y] > maxEdgeStrength) {
+            maxEdgeStrength = edgeIntensityByRow[y];
+            glassTop = y;
+        }
+    }
+    
+    // Look for strong horizontal edges in the bottom third
+    maxEdgeStrength = 0;
+    for (let y = Math.floor(height * 0.6); y < Math.floor(height * 0.9); y++) {
+        if (edgeIntensityByRow[y] > maxEdgeStrength) {
+            maxEdgeStrength = edgeIntensityByRow[y];
+            glassBottom = y;
+        }
+    }
+    
+    // Find liquid level within the glass boundaries
+    let liquidLevel = glassBottom;
+    let maxTransition = 0;
+    const windowSize = 5;
+    
+    for (let y = glassTop + windowSize; y < glassBottom - windowSize; y++) {
+        const above = liquidTransitionByRow.slice(y - windowSize, y).reduce((a, b) => a + b) / windowSize;
+        const below = liquidTransitionByRow.slice(y, y + windowSize).reduce((a, b) => a + b) / windowSize;
         const transition = Math.abs(above - below);
         
         if (transition > maxTransition) {
             maxTransition = transition;
-            transitionPoint = y;
+            liquidLevel = y;
         }
     }
     
-    // Only accept the transition if it's strong enough
-    if (maxTransition < 0.3) {
-        console.log('No clear beer level detected');
-    }
+    // Calculate beer level as percentage from bottom
+    const glassHeight = glassBottom - glassTop;
+    const beerHeight = glassBottom - liquidLevel;
+    const beerLevel = beerHeight / glassHeight;
     
     return {
-        beerLevel: 1 - (transitionPoint / height),
-        debugData: debugData
+        beerLevel: beerLevel,
+        debugData: debugData,
+        glassTop: glassTop,
+        glassBottom: glassBottom,
+        liquidLevel: liquidLevel
     };
 }
 
