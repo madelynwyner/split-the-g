@@ -2,7 +2,6 @@
 const video = document.getElementById('video');
 const canvas = document.getElementById('canvas');
 const captureBtn = document.getElementById('captureBtn');
-const fileInput = document.getElementById('fileInput');
 const resultDiv = document.getElementById('result');
 const scoreSpan = document.getElementById('score');
 const feedbackP = document.getElementById('feedback');
@@ -76,34 +75,8 @@ async function initCamera() {
         }
         
         alert(errorMessage);
-        
-        // Show file upload option more prominently when camera fails
-        document.querySelector('.upload-container').style.display = 'block';
     }
 }
-
-// Handle file upload
-fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        const img = new Image();
-        img.onload = () => {
-            // Hide video and show canvas
-            video.style.display = 'none';
-            canvas.style.display = 'block';
-            
-            // Draw image maintaining aspect ratio
-            const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
-            const x = (canvas.width - img.width * scale) / 2;
-            const y = (canvas.height - img.height * scale) / 2;
-            
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
-            processImage();
-        };
-        img.src = URL.createObjectURL(file);
-    }
-});
 
 // Capture photo
 captureBtn.addEventListener('click', () => {
@@ -111,7 +84,7 @@ captureBtn.addEventListener('click', () => {
     video.style.display = 'none';
     canvas.style.display = 'block';
     
-    // Flip the canvas horizontally if using front camera
+    // Draw the image at full resolution
     ctx.save();
     ctx.scale(-1, 1);
     ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
