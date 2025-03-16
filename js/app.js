@@ -104,10 +104,7 @@ captureBtn.addEventListener('click', () => {
     canvas.style.display = 'block';
     
     // Draw the image at full resolution
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-    ctx.restore();
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     
     processImage();
 });
@@ -130,6 +127,9 @@ async function processImage() {
         const beerPercentage = Math.round(beerLevel * 100);
         const emptyPercentage = 100 - beerPercentage;
         
+        // Draw debug visualization
+        drawDebugVisualization(debugData);
+        
         // Draw target line and G marker first
         drawTargetLine();
         
@@ -142,6 +142,37 @@ async function processImage() {
     } catch (err) {
         console.error('Error processing image:', err);
         alert('Error processing image. Please try again.');
+    }
+}
+
+// Function to draw debug visualization
+function drawDebugVisualization(debugData) {
+    // Draw the sampling area
+    const startX = Math.floor(canvas.width * 0.33);
+    const endX = Math.floor(canvas.width * 0.66);
+    
+    // Draw vertical lines showing sampling area
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+    ctx.lineWidth = 2;
+    
+    // Left boundary
+    ctx.moveTo(startX, 0);
+    ctx.lineTo(startX, canvas.height);
+    
+    // Right boundary
+    ctx.moveTo(endX, 0);
+    ctx.lineTo(endX, canvas.height);
+    ctx.stroke();
+    
+    // Draw detection points
+    const pointWidth = 3;
+    for (let y = 0; y < canvas.height; y++) {
+        const darkness = debugData[y];
+        if (darkness > 0.5) { // Only show strong dark pixel detections
+            ctx.fillStyle = `rgba(255, 0, 0, ${darkness})`;
+            ctx.fillRect(endX + 5, y - pointWidth/2, 20, pointWidth);
+        }
     }
 }
 
@@ -233,7 +264,9 @@ function analyzeBeerLevel(imageData, width, height) {
             const b = imageData[idx + 2];
             
             // Detect dark pixels (Guinness is very dark)
-            if (r < 60 && g < 60 && b < 60) {
+            // Adjusted threshold for better detection
+            if (r < 80 && g < 80 && b < 80 && 
+                Math.max(r, g, b) - Math.min(r, g, b) < 30) { // Check for true darkness
                 darkPixelsByRow[y]++;
             }
         }
@@ -246,15 +279,22 @@ function analyzeBeerLevel(imageData, width, height) {
     let maxTransition = 0;
     let transitionPoint = height * 0.75; // Default to 3/4 if no clear transition
     
-    for (let y = 10; y < height - 10; y++) {
-        const above = darkPixelsByRow.slice(y - 10, y).reduce((a, b) => a + b) / 10;
-        const below = darkPixelsByRow.slice(y, y + 10).reduce((a, b) => a + b) / 10;
+    // Use a larger window for smoother detection
+    const windowSize = 20;
+    for (let y = windowSize; y < height - windowSize; y++) {
+        const above = darkPixelsByRow.slice(y - windowSize, y).reduce((a, b) => a + b) / windowSize;
+        const below = darkPixelsByRow.slice(y, y + windowSize).reduce((a, b) => a + b) / windowSize;
         const transition = Math.abs(above - below);
         
         if (transition > maxTransition) {
             maxTransition = transition;
             transitionPoint = y;
         }
+    }
+    
+    // Only accept the transition if it's strong enough
+    if (maxTransition < 0.3) {
+        console.log('No clear beer level detected');
     }
     
     return {
