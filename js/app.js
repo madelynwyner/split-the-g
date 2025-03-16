@@ -13,8 +13,25 @@ const ctx = canvas.getContext('2d');
 let stream = null;
 
 // Set up canvas size
-canvas.width = 640;
-canvas.height = 480;
+let canvasWidth = 640;
+let canvasHeight = 480;
+
+// Function to resize canvas while maintaining aspect ratio
+function resizeCanvas() {
+    const containerWidth = video.offsetWidth;
+    const aspectRatio = canvasHeight / canvasWidth;
+    
+    canvas.style.width = containerWidth + 'px';
+    canvas.style.height = (containerWidth * aspectRatio) + 'px';
+    
+    // Keep the drawing context size consistent
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+}
+
+// Call resize on init and window resize
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
 
 // Check if we're on HTTPS or localhost
 if (window.location.protocol !== 'https:' && 
@@ -142,6 +159,41 @@ function drawTargetLine() {
     ctx.fillText('G', canvas.width - 40, targetY - 5);
 }
 
+// Function to draw brackets and percentages on the image
+function drawPercentageOverlay(beerPercentage, emptyPercentage) {
+    const targetY = canvas.height * 0.25; // 3/4 line position
+    
+    // Draw empty space bracket and percentage
+    ctx.beginPath();
+    ctx.strokeStyle = '#e74c3c'; // Red
+    ctx.lineWidth = 3;
+    // Left bracket
+    ctx.moveTo(10, 10);
+    ctx.lineTo(30, 10);
+    ctx.lineTo(30, targetY);
+    ctx.lineTo(10, targetY);
+    ctx.stroke();
+    
+    // Empty percentage text
+    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText(`${emptyPercentage}%`, 40, targetY / 2);
+    
+    // Draw beer space bracket and percentage
+    ctx.beginPath();
+    ctx.strokeStyle = '#2ecc71'; // Green
+    // Left bracket
+    ctx.moveTo(10, targetY);
+    ctx.lineTo(30, targetY);
+    ctx.lineTo(30, canvas.height - 10);
+    ctx.lineTo(10, canvas.height - 10);
+    ctx.stroke();
+    
+    // Beer percentage text
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillText(`${beerPercentage}%`, 40, targetY + (canvas.height - targetY) / 2);
+}
+
 // Analyze the beer level in the image
 function analyzeBeerLevel(imageData, width, height) {
     const debugData = new Array(height).fill(0);
@@ -202,8 +254,12 @@ function calculateScore(actualLevel, targetLevel) {
 // Display results to user
 function displayResults(score, level, beerPercentage, emptyPercentage) {
     scoreSpan.textContent = score.toFixed(2);
-    beerPercentageSpan.textContent = `${beerPercentage}%`;
-    emptyPercentageSpan.textContent = `${emptyPercentage}%`;
+    
+    // Draw the target line and G marker
+    drawTargetLine();
+    
+    // Draw the percentage brackets and text
+    drawPercentageOverlay(beerPercentage, emptyPercentage);
     
     let feedback;
     if (score > 95) {
