@@ -11,6 +11,9 @@ const beerPercentageSpan = document.getElementById('beerPercentage');
 
 const ctx = canvas.getContext('2d');
 let stream = null;
+let isAnalyzing = false;
+let lastAnalysisTime = 0;
+const analysisInterval = 100; // Analyze every 100ms
 
 // Set up canvas size
 let canvasWidth = 640;
@@ -75,8 +78,8 @@ async function initCamera() {
             };
         });
         
-        // Enable capture button once video is ready
-        captureBtn.disabled = false;
+        // Start real-time analysis
+        startRealTimeAnalysis();
         
     } catch (err) {
         console.error('Error accessing camera:', err);
@@ -97,17 +100,102 @@ async function initCamera() {
     }
 }
 
-// Capture photo
-captureBtn.addEventListener('click', () => {
+// Function to start real-time analysis
+function startRealTimeAnalysis() {
+    isAnalyzing = true;
+    requestAnimationFrame(analyzeFrame);
+}
+
+// Function to analyze each frame
+function analyzeFrame() {
+    if (!isAnalyzing) return;
+    
+    const now = Date.now();
+    if (now - lastAnalysisTime >= analysisInterval) {
+        // Draw current frame to canvas
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvasWidth;
+        tempCanvas.height = canvasHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+        
+        // Analyze the frame
+        const imageData = tempCtx.getImageData(0, 0, canvasWidth, canvasHeight);
+        const analysis = analyzeBeerLevel(imageData.data, canvasWidth, canvasHeight);
+        
+        // Draw alignment visualization on video
+        drawAlignmentVisualization(analysis);
+        
+        // Check if glass is aligned
+        const rimDifference = Math.abs(analysis.leftRimTop - analysis.rightRimTop);
+        if (rimDifference < 10) { // If rims are within 10 pixels of each other
+            // Auto capture
+            captureAndAnalyze();
+            return;
+        }
+        
+        lastAnalysisTime = now;
+    }
+    
+    requestAnimationFrame(analyzeFrame);
+}
+
+// Function to draw alignment visualization
+function drawAlignmentVisualization(analysis) {
+    const alignmentCanvas = document.createElement('canvas');
+    alignmentCanvas.width = canvasWidth;
+    alignmentCanvas.height = canvasHeight;
+    const alignCtx = alignmentCanvas.getContext('2d');
+    
+    // Draw the current video frame
+    alignCtx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
+    
+    // Draw rim lines
+    alignCtx.beginPath();
+    alignCtx.strokeStyle = 'rgba(0, 255, 255, 1)';
+    alignCtx.lineWidth = 2;
+    
+    // Front rim (lower)
+    alignCtx.moveTo(Math.floor(canvasWidth * 0.2), Math.max(analysis.leftRimTop, analysis.rightRimTop));
+    alignCtx.lineTo(Math.floor(canvasWidth * 0.8), Math.max(analysis.leftRimTop, analysis.rightRimTop));
+    
+    // Back rim (higher)
+    alignCtx.moveTo(Math.floor(canvasWidth * 0.2), Math.min(analysis.leftRimTop, analysis.rightRimTop));
+    alignCtx.lineTo(Math.floor(canvasWidth * 0.8), Math.min(analysis.leftRimTop, analysis.rightRimTop));
+    alignCtx.stroke();
+    
+    // Calculate rim difference and show guidance
+    const rimDifference = Math.abs(analysis.leftRimTop - analysis.rightRimTop);
+    alignCtx.font = 'bold 24px Arial';
+    alignCtx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    alignCtx.textAlign = 'center';
+    
+    if (rimDifference > 20) {
+        alignCtx.fillText('Tilt the glass to align the blue lines', canvasWidth/2, 50);
+    } else if (rimDifference > 10) {
+        alignCtx.fillStyle = 'rgba(255, 255, 0, 0.8)';
+        alignCtx.fillText('Almost there...', canvasWidth/2, 50);
+    } else {
+        alignCtx.fillStyle = 'rgba(0, 255, 0, 0.8)';
+        alignCtx.fillText('Perfect! Capturing...', canvasWidth/2, 50);
+    }
+    
+    // Update the video display with the visualization
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+    ctx.drawImage(alignmentCanvas, 0, 0);
+}
+
+// Function to capture and analyze the frame
+function captureAndAnalyze() {
+    isAnalyzing = false;
+    
     // Hide video and show canvas
     video.style.display = 'none';
     canvas.style.display = 'block';
     
-    // Draw the image at full resolution
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    
+    // Process the current frame
     processImage();
-});
+}
 
 // Process image and calculate score
 async function processImage() {
