@@ -264,20 +264,36 @@ function drawPercentageOverlay(beerPercentage, emptyPercentage) {
 
 // Draw target line and G marker
 function drawTargetLine() {
-    const targetY = canvas.height * 0.25; // 3/4 from the bottom
+    // Get the glass boundaries from the last analysis
+    const { glassTop, glassBottom } = window.lastAnalysis || {};
+    if (!glassTop || !glassBottom) return;
     
-    // Draw line
+    // Calculate target Y position (75% up from bottom between glass edges)
+    const glassHeight = glassBottom - glassTop;
+    const targetY = glassBottom - (glassHeight * 0.75);
+    
+    // Draw line with slightly increased opacity
     ctx.beginPath();
     ctx.moveTo(0, targetY);
-    ctx.lineTo(canvas.width - 50, targetY);
-    ctx.strokeStyle = '#e0b877';
-    ctx.lineWidth = 2;
+    ctx.lineTo(canvas.width - 60, targetY);
+    ctx.strokeStyle = 'rgba(224, 184, 119, 0.9)'; // #e0b877 with higher opacity
+    ctx.lineWidth = 3; // Slightly thicker line
     ctx.stroke();
     
-    // Draw G marker
-    ctx.font = 'bold 24px Arial';
+    // Draw G marker with enhanced visibility
+    ctx.font = 'bold 32px Arial'; // Larger, bolder font
     ctx.fillStyle = '#e0b877';
-    ctx.fillText('G', canvas.width - 40, targetY - 5);
+    // Add subtle shadow for better contrast
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.fillText('G', canvas.width - 50, targetY - 8);
+    // Reset shadow
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
 }
 
 // Analyze the beer level in the image
