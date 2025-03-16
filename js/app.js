@@ -146,8 +146,11 @@ async function processImage() {
             analysis.rightRimTop
         );
         
+        // Calculate G line position (60% up from bottom of glass)
+        const glassHeight = analysis.glassBottom - analysis.glassTop;
+        const targetY = Math.round(analysis.glassBottom - (glassHeight * 0.6));
+        
         // Draw target line and G marker
-        const targetY = Math.floor(canvas.height * analysisRegions.targetY);
         drawTargetLine(targetY);
         
         // Calculate score based on how close liquid level is to G line
@@ -547,7 +550,7 @@ function calculateScore(liquidLevel, targetY) {
     
     // Maximum allowed difference (in pixels) for scoring
     // Smaller value = more strict scoring
-    const maxAllowedDifference = 20; // More strict scoring
+    const maxAllowedDifference = 15; // Even more strict scoring
     
     // Calculate score as percentage of accuracy
     // The closer to the G line, the higher the score
@@ -571,14 +574,17 @@ function displayResults(score) {
     if (score >= 95) {
         feedback = "Perfect G split! You're a Guinness master! 🏆";
     } else if (score >= 85) {
-        feedback = "Excellent split! Almost perfect! 🎯";
+        feedback = "Almost there! A little " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "higher" : "lower") + "! 🎯";
     } else if (score >= 70) {
-        feedback = "Good split! Keep practicing! 🎯";
+        feedback = "Getting closer! Move the liquid " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "up" : "down") + "! 🎯";
     } else if (score >= 50) {
-        feedback = "Getting there! Adjust to match the G line! 🎯";
+        feedback = "Keep adjusting! Need to go " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "higher" : "lower") + "! 🎯";
     } else {
-        feedback = "Try to get the liquid level closer to the G line! 🎯";
+        feedback = "Try again! The liquid level needs to be much " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "higher" : "lower") + "! 🎯";
     }
+    
+    // Store target Y for feedback
+    window.lastTargetY = window.lastAnalysis.targetY;
     
     feedbackP.textContent = feedback;
     resultDiv.style.display = 'block';
