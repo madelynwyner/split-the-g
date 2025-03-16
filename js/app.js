@@ -146,9 +146,8 @@ async function processImage() {
             analysis.rightRimTop
         );
         
-        // Calculate G line position - exactly at 60% of glass height from top
-        const glassHeight = analysis.glassBottom - analysis.glassTop;
-        const targetY = Math.round(analysis.glassTop + (glassHeight * 0.6));
+        // Calculate G line position - exactly 60% up from bottom
+        const targetY = Math.round(analysis.glassBottom - (analysis.glassBottom - analysis.glassTop) * 0.6);
         
         // Draw target line and G marker
         drawTargetLine(targetY);
