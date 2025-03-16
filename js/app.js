@@ -152,7 +152,7 @@ async function processImage() {
         // Draw target line and G marker
         drawTargetLine(targetY);
         
-        // Calculate score based on how close liquid level is to G line
+        // Calculate score based on how close the beer percentage is to 60%
         const score = calculateScore(analysis.liquidLevel, targetY);
         
         // Update percentages
@@ -543,24 +543,28 @@ function analyzeBeerLevel(imageData, width, height) {
     };
 }
 
-// Calculate score based on how close the liquid level is to target line
+// Calculate score based on how close the beer percentage is to 60%
 function calculateScore(liquidLevel, targetY) {
-    // Calculate the pixel difference between liquid level and G line
-    const pixelDifference = Math.abs(liquidLevel - targetY);
+    // Get the current beer percentage
+    const { glassTop, glassBottom } = window.lastAnalysis;
+    const totalHeight = glassBottom - glassTop;
+    const beerHeight = glassBottom - liquidLevel;
+    const beerPercentage = Math.round((beerHeight / totalHeight) * 100);
     
-    // Maximum allowed difference (in pixels) for scoring
+    // Calculate how far off from 60% we are
+    const percentageDifference = Math.abs(beerPercentage - 60);
+    
+    // Maximum allowed difference for scoring
     // Smaller value = more strict scoring
-    const maxAllowedDifference = 10; // Very strict scoring
+    const maxAllowedDifference = 5; // Very strict: only 5% difference allowed for scoring
     
     // Calculate score as percentage of accuracy
-    // The closer to the G line, the higher the score
-    const score = Math.max(0, 100 - ((pixelDifference / maxAllowedDifference) * 100));
+    // The closer to 60%, the higher the score
+    const score = Math.max(0, 100 - ((percentageDifference / maxAllowedDifference) * 100));
     
     // For debugging
-    console.log('Bottom of glass:', window.lastAnalysis.glassBottom);
-    console.log('G line (60% up):', targetY);
-    console.log('Liquid Level:', liquidLevel);
-    console.log('Pixel Difference:', pixelDifference);
+    console.log('Beer Percentage:', beerPercentage + '%');
+    console.log('Difference from 60%:', percentageDifference + '%');
     console.log('Score:', score);
     
     // Round to nearest integer
@@ -571,17 +575,23 @@ function calculateScore(liquidLevel, targetY) {
 function displayResults(score, targetY) {
     scoreSpan.textContent = score.toFixed(2);
     
+    // Get current beer percentage for feedback
+    const { glassTop, glassBottom, liquidLevel } = window.lastAnalysis;
+    const totalHeight = glassBottom - glassTop;
+    const beerHeight = glassBottom - liquidLevel;
+    const beerPercentage = Math.round((beerHeight / totalHeight) * 100);
+    
     let feedback;
     if (score >= 95) {
         feedback = "Perfect G split! You're a Guinness master! 🏆";
     } else if (score >= 85) {
-        feedback = "Almost there! A little " + (window.lastAnalysis.liquidLevel < targetY ? "higher" : "lower") + "! 🎯";
+        feedback = "Almost there! Need " + (beerPercentage < 60 ? "more" : "less") + " Guinness! 🎯";
     } else if (score >= 70) {
-        feedback = "Getting closer! Move the liquid " + (window.lastAnalysis.liquidLevel < targetY ? "up" : "down") + "! 🎯";
+        feedback = "Getting closer! Pour " + (beerPercentage < 60 ? "more" : "less") + "! 🎯";
     } else if (score >= 50) {
-        feedback = "Keep adjusting! Need to go " + (window.lastAnalysis.liquidLevel < targetY ? "higher" : "lower") + "! 🎯";
+        feedback = "Keep adjusting! Need " + (beerPercentage < 60 ? "more" : "less") + " beer! 🎯";
     } else {
-        feedback = "Try again! The liquid level needs to be much " + (window.lastAnalysis.liquidLevel < targetY ? "higher" : "lower") + "! 🎯";
+        feedback = "Try again! You need much " + (beerPercentage < 60 ? "more" : "less") + " Guinness! 🎯";
     }
     
     feedbackP.textContent = feedback;
