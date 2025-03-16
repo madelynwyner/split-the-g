@@ -146,9 +146,8 @@ async function processImage() {
             analysis.rightRimTop
         );
         
-        // Calculate G line position (60% up from bottom of glass)
-        const glassHeight = analysis.glassBottom - analysis.glassTop;
-        const targetY = Math.round(analysis.glassBottom - (glassHeight * 0.6));
+        // Calculate G line position - exactly 60% up from bottom
+        const targetY = Math.round(analysis.glassBottom - (analysis.glassBottom * 0.6));
         
         // Draw target line and G marker
         drawTargetLine(targetY);
@@ -164,7 +163,7 @@ async function processImage() {
         drawPercentageOverlay(beerPercentage, emptyPercentage);
         
         // Finally update the score display
-        displayResults(score);
+        displayResults(score, targetY);
         
         // Hide capture button after first photo
         captureBtn.style.display = 'none';
@@ -550,15 +549,16 @@ function calculateScore(liquidLevel, targetY) {
     
     // Maximum allowed difference (in pixels) for scoring
     // Smaller value = more strict scoring
-    const maxAllowedDifference = 15; // Even more strict scoring
+    const maxAllowedDifference = 10; // Very strict scoring
     
     // Calculate score as percentage of accuracy
     // The closer to the G line, the higher the score
     const score = Math.max(0, 100 - ((pixelDifference / maxAllowedDifference) * 100));
     
     // For debugging
+    console.log('Bottom of glass:', window.lastAnalysis.glassBottom);
+    console.log('G line (60% up):', targetY);
     console.log('Liquid Level:', liquidLevel);
-    console.log('Target Y:', targetY);
     console.log('Pixel Difference:', pixelDifference);
     console.log('Score:', score);
     
@@ -567,24 +567,21 @@ function calculateScore(liquidLevel, targetY) {
 }
 
 // Display results to user
-function displayResults(score) {
+function displayResults(score, targetY) {
     scoreSpan.textContent = score.toFixed(2);
     
     let feedback;
     if (score >= 95) {
         feedback = "Perfect G split! You're a Guinness master! 🏆";
     } else if (score >= 85) {
-        feedback = "Almost there! A little " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "higher" : "lower") + "! 🎯";
+        feedback = "Almost there! A little " + (window.lastAnalysis.liquidLevel < targetY ? "higher" : "lower") + "! 🎯";
     } else if (score >= 70) {
-        feedback = "Getting closer! Move the liquid " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "up" : "down") + "! 🎯";
+        feedback = "Getting closer! Move the liquid " + (window.lastAnalysis.liquidLevel < targetY ? "up" : "down") + "! 🎯";
     } else if (score >= 50) {
-        feedback = "Keep adjusting! Need to go " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "higher" : "lower") + "! 🎯";
+        feedback = "Keep adjusting! Need to go " + (window.lastAnalysis.liquidLevel < targetY ? "higher" : "lower") + "! 🎯";
     } else {
-        feedback = "Try again! The liquid level needs to be much " + (window.lastAnalysis.liquidLevel < window.lastTargetY ? "higher" : "lower") + "! 🎯";
+        feedback = "Try again! The liquid level needs to be much " + (window.lastAnalysis.liquidLevel < targetY ? "higher" : "lower") + "! 🎯";
     }
-    
-    // Store target Y for feedback
-    window.lastTargetY = window.lastAnalysis.targetY;
     
     feedbackP.textContent = feedback;
     resultDiv.style.display = 'block';
