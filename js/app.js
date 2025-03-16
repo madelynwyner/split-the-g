@@ -181,19 +181,25 @@ function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, l
     ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
     ctx.lineWidth = 2;
     
-    // Draw both rim positions in a lighter color
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+    // Draw both rim positions in full color
     // Left rim
     ctx.moveTo(Math.floor(canvas.width * 0.2), leftRimTop);
     ctx.lineTo(Math.floor(canvas.width * 0.4), leftRimTop);
     // Right rim
     ctx.moveTo(Math.floor(canvas.width * 0.6), rightRimTop);
     ctx.lineTo(Math.floor(canvas.width * 0.8), rightRimTop);
-    ctx.stroke();
     
-    // Draw the selected glass top line (lower rim) in full opacity
+    // Connect the rims with dotted lines to show tilt
+    ctx.setLineDash([5, 5]);
+    ctx.moveTo(Math.floor(canvas.width * 0.4), leftRimTop);
+    ctx.lineTo(Math.floor(canvas.width * 0.6), rightRimTop);
+    ctx.stroke();
+    ctx.setLineDash([]); // Reset to solid line
+    
+    // Draw the selected glass top line (lower rim) in a different color
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+    ctx.strokeStyle = 'rgba(0, 255, 255, 1)'; // Full opacity
+    ctx.lineWidth = 2;
     ctx.moveTo(startX - 20, glassTop);
     ctx.lineTo(endX + 20, glassTop);
     
@@ -287,9 +293,9 @@ function drawTargetLine() {
     const { glassTop, glassBottom } = window.lastAnalysis || {};
     if (!glassTop || !glassBottom) return;
     
-    // Calculate target Y position (75% up from bottom between glass edges)
+    // Calculate target Y position (60% up from bottom between glass edges)
     const glassHeight = glassBottom - glassTop;
-    const targetY = glassBottom - (glassHeight * 0.75);
+    const targetY = glassBottom - (glassHeight * 0.60);
     
     // Draw line with slightly increased opacity
     ctx.beginPath();
