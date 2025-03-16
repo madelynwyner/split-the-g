@@ -419,7 +419,7 @@ function analyzeBeerLevel(imageData, width, height) {
     leftTopEdges.sort((a, b) => b.strength - a.strength);
     rightTopEdges.sort((a, b) => b.strength - a.strength);
     
-    // Find the highest strong edge for each side
+    // Find the highest strong edge for each side (this will be the back rim)
     if (leftTopEdges.length > 0) {
         const strongLeftEdges = leftTopEdges.slice(0, 3);
         leftRimTop = Math.min(...strongLeftEdges.map(edge => edge.position));
@@ -430,8 +430,64 @@ function analyzeBeerLevel(imageData, width, height) {
         rightRimTop = Math.min(...strongRightEdges.map(edge => edge.position));
     }
     
-    // Use the lower of the two rim positions as the glass top
-    const glassTop = Math.max(leftRimTop, rightRimTop);
+    // Use the higher of the two rim positions as the back rim
+    const backRim = Math.min(leftRimTop, rightRimTop);
+    
+    // Now look for the front rim by scanning downward from the back rim
+    let leftFrontRim = backRim;
+    let rightFrontRim = backRim;
+    const maxRimDistance = height * 0.15; // Maximum expected distance between front and back rim
+    
+    // Scan for front rim (look for bright reflective edges)
+    for (let y = backRim + 5; y < backRim + maxRimDistance; y++) {
+        // Check left side
+        let leftBrightness = 0;
+        let leftEdgeStrength = 0;
+        for (let x = leftRegionStart; x < leftRegionEnd; x++) {
+            const idx = (y * width + x) * 4;
+            // Calculate brightness and look for bright spots (reflections)
+            const pixelBrightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+            leftBrightness += pixelBrightness;
+            // Also check for edge strength
+            if (y < height - 1) {
+                const idxBelow = ((y + 1) * width + x) * 4;
+                const belowBrightness = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
+                leftEdgeStrength += Math.abs(pixelBrightness - belowBrightness);
+            }
+        }
+        leftBrightness /= (leftRegionEnd - leftRegionStart);
+        leftEdgeStrength /= (leftRegionEnd - leftRegionStart);
+        
+        // Check right side
+        let rightBrightness = 0;
+        let rightEdgeStrength = 0;
+        for (let x = rightRegionStart; x < rightRegionEnd; x++) {
+            const idx = (y * width + x) * 4;
+            const pixelBrightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+            rightBrightness += pixelBrightness;
+            if (y < height - 1) {
+                const idxBelow = ((y + 1) * width + x) * 4;
+                const belowBrightness = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
+                rightEdgeStrength += Math.abs(pixelBrightness - belowBrightness);
+            }
+        }
+        rightBrightness /= (rightRegionEnd - rightRegionStart);
+        rightEdgeStrength /= (rightRegionEnd - rightRegionStart);
+        
+        // Update front rim positions if we find a strong edge with high brightness
+        const brightnessThreshold = 150;
+        const edgeThreshold = 20;
+        
+        if (leftBrightness > brightnessThreshold && leftEdgeStrength > edgeThreshold) {
+            leftFrontRim = y;
+        }
+        if (rightBrightness > brightnessThreshold && rightEdgeStrength > edgeThreshold) {
+            rightFrontRim = y;
+        }
+    }
+    
+    // Use the lower of the two front rim positions as the glass top
+    const glassTop = Math.max(leftFrontRim, rightFrontRim);
     
     // Find glass bottom (keeping existing logic as it works well)
     let glassBottom = height * 0.75;
