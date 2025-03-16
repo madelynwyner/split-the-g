@@ -176,34 +176,23 @@ function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, l
     ctx.lineTo(endX, canvas.height);
     ctx.stroke();
     
-    // Draw glass top and bottom lines
+    // Draw both rim positions with full opacity
     ctx.beginPath();
-    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
+    ctx.strokeStyle = 'rgba(0, 255, 255, 1)'; // Full opacity cyan
     ctx.lineWidth = 2;
     
-    // Draw both rim positions in full color
-    // Left rim
-    ctx.moveTo(Math.floor(canvas.width * 0.2), leftRimTop);
-    ctx.lineTo(Math.floor(canvas.width * 0.4), leftRimTop);
-    // Right rim
-    ctx.moveTo(Math.floor(canvas.width * 0.6), rightRimTop);
-    ctx.lineTo(Math.floor(canvas.width * 0.8), rightRimTop);
+    // Front rim (lower)
+    ctx.moveTo(Math.floor(canvas.width * 0.2), Math.max(leftRimTop, rightRimTop));
+    ctx.lineTo(Math.floor(canvas.width * 0.8), Math.max(leftRimTop, rightRimTop));
     
-    // Connect the rims with dotted lines to show tilt
-    ctx.setLineDash([5, 5]);
-    ctx.moveTo(Math.floor(canvas.width * 0.4), leftRimTop);
-    ctx.lineTo(Math.floor(canvas.width * 0.6), rightRimTop);
+    // Back rim (higher)
+    ctx.moveTo(Math.floor(canvas.width * 0.2), Math.min(leftRimTop, rightRimTop));
+    ctx.lineTo(Math.floor(canvas.width * 0.8), Math.min(leftRimTop, rightRimTop));
     ctx.stroke();
-    ctx.setLineDash([]); // Reset to solid line
-    
-    // Draw the selected glass top line (lower rim) in a different color
-    ctx.beginPath();
-    ctx.strokeStyle = 'rgba(0, 255, 255, 1)'; // Full opacity
-    ctx.lineWidth = 2;
-    ctx.moveTo(startX - 20, glassTop);
-    ctx.lineTo(endX + 20, glassTop);
     
     // Bottom line
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(0, 255, 255, 1)';
     ctx.moveTo(startX - 20, glassBottom);
     ctx.lineTo(endX + 20, glassBottom);
     ctx.stroke();
@@ -459,27 +448,94 @@ function analyzeBeerLevel(imageData, width, height) {
     let liquidLevel = glassBottom;
     let maxTransition = 0;
     const windowSize = 5;
+    const minColorDiff = 30; // Minimum color difference to consider as a transition
     
-    for (let y = glassTop + windowSize; y < glassBottom - windowSize; y++) {
-        const above = liquidTransitionByRow.slice(y - windowSize, y).reduce((a, b) => a + b) / windowSize;
-        const below = liquidTransitionByRow.slice(y, y + windowSize).reduce((a, b) => a + b) / windowSize;
-        const transition = Math.abs(above - below);
+    // Start from the bottom and move up
+    for (let y = glassBottom - windowSize; y > glassTop + windowSize; y--) {
+        const currentWindow = [];
+        const aboveWindow = [];
         
-        if (transition > maxTransition) {
-            maxTransition = transition;
+        // Sample colors in the current window and window above
+        for (let x = startX; x < endX; x++) {
+            for (let wy = 0; wy < windowSize; wy++) {
+                const currentIdx = ((y + wy) * width + x) * 4;
+                const aboveIdx = ((y - windowSize + wy) * width + x) * 4;
+                
+                // Get RGB values
+                const currentR = imageData[currentIdx];
+                const currentG = imageData[currentIdx + 1];
+                const currentB = imageData[currentIdx + 2];
+                const aboveR = imageData[aboveIdx];
+                const aboveG = imageData[aboveIdx + 1];
+                const aboveB = imageData[aboveIdx + 2];
+                
+                // Calculate color values
+                currentWindow.push({
+                    brightness: (currentR + currentG + currentB) / 3,
+                    r: currentR,
+                    g: currentG,
+                    b: currentB
+                });
+                
+                aboveWindow.push({
+                    brightness: (aboveR + aboveG + aboveB) / 3,
+                    r: aboveR,
+                    g: aboveG,
+                    b: aboveB
+                });
+            }
+        }
+        
+        // Calculate average colors for both windows
+        const currentAvg = currentWindow.reduce((acc, val) => ({
+            brightness: acc.brightness + val.brightness,
+            r: acc.r + val.r,
+            g: acc.g + val.g,
+            b: acc.b + val.b
+        }), { brightness: 0, r: 0, g: 0, b: 0 });
+        
+        const aboveAvg = aboveWindow.reduce((acc, val) => ({
+            brightness: acc.brightness + val.brightness,
+            r: acc.r + val.r,
+            g: acc.g + val.g,
+            b: acc.b + val.b
+        }), { brightness: 0, r: 0, g: 0, b: 0 });
+        
+        const n = currentWindow.length;
+        currentAvg.brightness /= n;
+        currentAvg.r /= n;
+        currentAvg.g /= n;
+        currentAvg.b /= n;
+        aboveAvg.brightness /= n;
+        aboveAvg.r /= n;
+        aboveAvg.g /= n;
+        aboveAvg.b /= n;
+        
+        // Calculate color difference
+        const colorDiff = Math.abs(currentAvg.brightness - aboveAvg.brightness) +
+                         Math.abs(currentAvg.r - aboveAvg.r) +
+                         Math.abs(currentAvg.g - aboveAvg.g) +
+                         Math.abs(currentAvg.b - aboveAvg.b);
+        
+        // Store for visualization
+        debugData[y] = colorDiff / 1000;
+        
+        // If we find a significant color transition
+        if (colorDiff > minColorDiff && colorDiff > maxTransition) {
+            maxTransition = colorDiff;
             liquidLevel = y;
         }
     }
     
     // Calculate beer level as percentage from bottom
-    const glassHeight = glassBottom - glassTop;
+    const glassHeight = glassBottom - Math.max(leftRimTop, rightRimTop);
     const beerHeight = glassBottom - liquidLevel;
     const beerLevel = beerHeight / glassHeight;
     
     return {
         beerLevel: beerLevel,
         debugData: debugData,
-        glassTop: glassTop,
+        glassTop: Math.max(leftRimTop, rightRimTop), // Use lower rim as glass top
         glassBottom: glassBottom,
         liquidLevel: liquidLevel,
         leftRimTop: leftRimTop,
