@@ -303,14 +303,18 @@ function analyzeBeerLevel(imageData, width, height) {
             const brightnessAbove = (rAbove + gAbove + bAbove) / 3;
             const brightnessBelow = (rBelow + gBelow + bBelow) / 3;
             
-            // Detect vertical edges (glass sides)
+            // Enhanced edge detection for glass top
             const verticalEdge = Math.abs(brightness - brightnessAbove) + 
                                Math.abs(brightness - brightnessBelow);
             
+            // Also look for brightness changes that might indicate glass edges
+            const brightnessDiff = Math.abs(brightness - ((brightnessAbove + brightnessBelow) / 2));
+            
+            // Combine both types of edge detection
+            edgeIntensityByRow[y] += (verticalEdge > 30 || brightnessDiff > 20) ? 1 : 0;
+            
             // Detect color/brightness transitions (liquid level)
             const colorDiff = Math.abs(brightnessAbove - brightnessBelow);
-            
-            edgeIntensityByRow[y] += verticalEdge > 30 ? 1 : 0;
             liquidTransitionByRow[y] += colorDiff > 20 ? 1 : 0;
         }
         
@@ -320,21 +324,36 @@ function analyzeBeerLevel(imageData, width, height) {
         debugData[y] = liquidTransitionByRow[y];
     }
     
-    // Find glass top and bottom
-    let glassTop = height * 0.25;
-    let glassBottom = height * 0.75;
-    let maxEdgeStrength = 0;
+    // Find glass top using a more sophisticated approach
+    let glassTop = height * 0.25; // Default value
+    let topEdges = [];
     
-    // Look for strong horizontal edges in the top third
-    for (let y = Math.floor(height * 0.1); y < Math.floor(height * 0.4); y++) {
-        if (edgeIntensityByRow[y] > maxEdgeStrength) {
-            maxEdgeStrength = edgeIntensityByRow[y];
-            glassTop = y;
+    // First, find all significant edges in the top half
+    const minEdgeStrength = 0.15; // Minimum strength to consider as an edge
+    for (let y = Math.floor(height * 0.05); y < Math.floor(height * 0.5); y++) {
+        if (edgeIntensityByRow[y] > minEdgeStrength) {
+            topEdges.push({
+                position: y,
+                strength: edgeIntensityByRow[y]
+            });
         }
     }
     
-    // Look for strong horizontal edges in the bottom third
-    maxEdgeStrength = 0;
+    // Sort edges by strength
+    topEdges.sort((a, b) => b.strength - a.strength);
+    
+    // Find the highest strong edge
+    if (topEdges.length > 0) {
+        // Get the top 3 strongest edges
+        const strongEdges = topEdges.slice(0, 3);
+        // Use the highest position among the strong edges
+        glassTop = Math.min(...strongEdges.map(edge => edge.position));
+    }
+    
+    // Find glass bottom (keeping existing logic as it works well)
+    let glassBottom = height * 0.75;
+    let maxEdgeStrength = 0;
+    
     for (let y = Math.floor(height * 0.6); y < Math.floor(height * 0.9); y++) {
         if (edgeIntensityByRow[y] > maxEdgeStrength) {
             maxEdgeStrength = edgeIntensityByRow[y];
