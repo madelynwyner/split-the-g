@@ -117,18 +117,19 @@ async function processImage() {
         const data = imageData.data;
         
         // Find the beer level using color analysis
-        const { beerLevel, debugData, glassTop, glassBottom, liquidLevel } = analyzeBeerLevel(data, canvas.width, canvas.height);
+        const analysis = analyzeBeerLevel(data, canvas.width, canvas.height);
+        window.lastAnalysis = analysis; // Store for use in drawPercentageOverlay
         
         // Calculate score based on how close to 3/4 the level is
         const targetLevel = 0.75; // 3/4 of the glass
-        const score = calculateScore(beerLevel, targetLevel);
+        const score = calculateScore(analysis.beerLevel, targetLevel);
         
         // Update percentages
-        const beerPercentage = Math.round(beerLevel * 100);
+        const beerPercentage = Math.round(analysis.beerLevel * 100);
         const emptyPercentage = 100 - beerPercentage;
         
         // Draw debug visualization with glass boundaries
-        drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel);
+        drawDebugVisualization(analysis.debugData, analysis.glassTop, analysis.glassBottom, analysis.liquidLevel);
         
         // Draw target line and G marker first
         drawTargetLine();
@@ -138,6 +139,9 @@ async function processImage() {
         
         // Finally update the score display
         displayResults(score);
+        
+        // Hide capture button after first photo
+        captureBtn.style.display = 'none';
         
     } catch (err) {
         console.error('Error processing image:', err);
@@ -200,27 +204,36 @@ function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel) {
 
 // Function to draw brackets and percentages on the image
 function drawPercentageOverlay(beerPercentage, emptyPercentage) {
-    const targetY = canvas.height * 0.25; // 3/4 line position
-    
     // Add semi-transparent background for better text visibility
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     
-    // Empty space bracket and percentage
+    // Get the current glass boundaries from the last analysis
+    const { glassTop, glassBottom, liquidLevel } = window.lastAnalysis || {};
+    if (!glassTop || !glassBottom || !liquidLevel) return;
+    
+    // Empty space bracket and percentage (from glass top to liquid)
     ctx.beginPath();
     ctx.strokeStyle = '#e74c3c'; // Red
     ctx.lineWidth = 3;
-    // Left bracket
-    ctx.moveTo(10, 10);
-    ctx.lineTo(30, 10);
-    ctx.lineTo(30, targetY);
-    ctx.lineTo(10, targetY);
+    // Left bracket for empty space
+    ctx.moveTo(10, glassTop);
+    ctx.lineTo(30, glassTop);
+    ctx.lineTo(30, liquidLevel);
+    ctx.lineTo(10, liquidLevel);
     ctx.stroke();
     
+    // Calculate new percentages based on actual glass boundaries
+    const totalHeight = glassBottom - glassTop;
+    const emptyHeight = liquidLevel - glassTop;
+    const beerHeight = glassBottom - liquidLevel;
+    const newEmptyPercentage = Math.round((emptyHeight / totalHeight) * 100);
+    const newBeerPercentage = Math.round((beerHeight / totalHeight) * 100);
+    
     // Background for empty percentage
-    const emptyText = `${emptyPercentage}%`;
+    const emptyText = `${newEmptyPercentage}%`;
     ctx.font = 'bold 24px Arial';
     const emptyMetrics = ctx.measureText(emptyText);
-    const emptyY = targetY / 2;
+    const emptyY = glassTop + (liquidLevel - glassTop) / 2;
     ctx.fillRect(35, emptyY - 20, emptyMetrics.width + 10, 30);
     
     // Empty percentage text
@@ -230,16 +243,16 @@ function drawPercentageOverlay(beerPercentage, emptyPercentage) {
     // Beer space bracket and percentage
     ctx.beginPath();
     ctx.strokeStyle = '#2ecc71'; // Green
-    // Left bracket
-    ctx.moveTo(10, targetY);
-    ctx.lineTo(30, targetY);
-    ctx.lineTo(30, canvas.height - 10);
-    ctx.lineTo(10, canvas.height - 10);
+    // Left bracket for beer
+    ctx.moveTo(10, liquidLevel);
+    ctx.lineTo(30, liquidLevel);
+    ctx.lineTo(30, glassBottom);
+    ctx.lineTo(10, glassBottom);
     ctx.stroke();
     
     // Background for beer percentage
-    const beerText = `${beerPercentage}%`;
-    const beerY = targetY + (canvas.height - targetY) / 2;
+    const beerText = `${newBeerPercentage}%`;
+    const beerY = liquidLevel + (glassBottom - liquidLevel) / 2;
     const beerMetrics = ctx.measureText(beerText);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
     ctx.fillRect(35, beerY - 20, beerMetrics.width + 10, 30);
@@ -423,6 +436,7 @@ tryAgainBtn.addEventListener('click', () => {
     resultDiv.style.display = 'none';
     canvas.style.display = 'none';
     video.style.display = 'block';
+    captureBtn.style.display = 'block'; // Show capture button again
 });
 
 // Initialize
