@@ -6,6 +6,8 @@ const resultDiv = document.getElementById('result');
 const scoreSpan = document.getElementById('score');
 const feedbackP = document.getElementById('feedback');
 const tryAgainBtn = document.getElementById('tryAgainBtn');
+const emptyPercentageSpan = document.getElementById('emptyPercentage');
+const beerPercentageSpan = document.getElementById('beerPercentage');
 
 const ctx = canvas.getContext('2d');
 let stream = null;
@@ -103,19 +105,41 @@ async function processImage() {
         // Find the beer level using color analysis
         const { beerLevel, debugData } = analyzeBeerLevel(data, canvas.width, canvas.height);
         
-        // Draw debug visualization
-        drawDebugVisualization(debugData);
+        // Draw target line and G marker
+        drawTargetLine();
         
         // Calculate score based on how close to 3/4 the level is
         const targetLevel = 0.75; // 3/4 of the glass
         const score = calculateScore(beerLevel, targetLevel);
         
-        displayResults(score, beerLevel);
+        // Update percentages
+        const beerPercentage = Math.round(beerLevel * 100);
+        const emptyPercentage = 100 - beerPercentage;
+        
+        displayResults(score, beerLevel, beerPercentage, emptyPercentage);
         
     } catch (err) {
         console.error('Error processing image:', err);
         alert('Error processing image. Please try again.');
     }
+}
+
+// Draw target line and G marker
+function drawTargetLine() {
+    const targetY = canvas.height * 0.25; // 3/4 from the bottom
+    
+    // Draw line
+    ctx.beginPath();
+    ctx.moveTo(0, targetY);
+    ctx.lineTo(canvas.width - 50, targetY);
+    ctx.strokeStyle = '#e0b877';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    // Draw G marker
+    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = '#e0b877';
+    ctx.fillText('G', canvas.width - 40, targetY - 5);
 }
 
 // Analyze the beer level in the image
@@ -167,21 +191,6 @@ function analyzeBeerLevel(imageData, width, height) {
     };
 }
 
-// Draw debug visualization
-function drawDebugVisualization(debugData) {
-    const debugCanvas = document.createElement('canvas');
-    debugCanvas.width = 50;
-    debugCanvas.height = canvas.height;
-    const debugCtx = debugCanvas.getContext('2d');
-    
-    debugData.forEach((value, y) => {
-        debugCtx.fillStyle = `rgba(224, 184, 119, ${value})`;
-        debugCtx.fillRect(0, y, 50, 1);
-    });
-    
-    ctx.drawImage(debugCanvas, canvas.width - 50, 0);
-}
-
 // Calculate score based on how close the level is to target
 function calculateScore(actualLevel, targetLevel) {
     const difference = Math.abs(actualLevel - targetLevel);
@@ -191,8 +200,10 @@ function calculateScore(actualLevel, targetLevel) {
 }
 
 // Display results to user
-function displayResults(score, level) {
+function displayResults(score, level, beerPercentage, emptyPercentage) {
     scoreSpan.textContent = score.toFixed(2);
+    beerPercentageSpan.textContent = `${beerPercentage}%`;
+    emptyPercentageSpan.textContent = `${emptyPercentage}%`;
     
     let feedback;
     if (score > 95) {
