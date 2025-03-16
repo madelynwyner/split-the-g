@@ -129,7 +129,14 @@ async function processImage() {
         const emptyPercentage = 100 - beerPercentage;
         
         // Draw debug visualization with glass boundaries
-        drawDebugVisualization(analysis.debugData, analysis.glassTop, analysis.glassBottom, analysis.liquidLevel);
+        drawDebugVisualization(
+            analysis.debugData,
+            analysis.glassTop,
+            analysis.glassBottom,
+            analysis.liquidLevel,
+            analysis.leftRimTop,
+            analysis.rightRimTop
+        );
         
         // Draw target line and G marker first
         drawTargetLine();
@@ -150,7 +157,7 @@ async function processImage() {
 }
 
 // Function to draw debug visualization
-function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel) {
+function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, leftRimTop, rightRimTop) {
     // Draw the sampling area
     const startX = Math.floor(canvas.width * 0.33);
     const endX = Math.floor(canvas.width * 0.66);
@@ -174,7 +181,19 @@ function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel) {
     ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
     ctx.lineWidth = 2;
     
-    // Top line
+    // Draw both rim positions in a lighter color
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.4)';
+    // Left rim
+    ctx.moveTo(Math.floor(canvas.width * 0.2), leftRimTop);
+    ctx.lineTo(Math.floor(canvas.width * 0.4), leftRimTop);
+    // Right rim
+    ctx.moveTo(Math.floor(canvas.width * 0.6), rightRimTop);
+    ctx.lineTo(Math.floor(canvas.width * 0.8), rightRimTop);
+    ctx.stroke();
+    
+    // Draw the selected glass top line (lower rim) in full opacity
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.8)';
     ctx.moveTo(startX - 20, glassTop);
     ctx.lineTo(endX + 20, glassTop);
     
@@ -300,84 +319,124 @@ function drawTargetLine() {
 function analyzeBeerLevel(imageData, width, height) {
     const debugData = new Array(height).fill(0);
     let edgeIntensityByRow = new Array(height).fill(0);
+    let leftEdgeIntensity = new Array(height).fill(0);
+    let rightEdgeIntensity = new Array(height).fill(0);
     let liquidTransitionByRow = new Array(height).fill(0);
     
-    // Sample the middle third of the image width
+    // Sample the middle third of the image width for liquid detection
     const startX = Math.floor(width * 0.33);
     const endX = Math.floor(width * 0.66);
     const sampleWidth = endX - startX;
     
+    // Define regions for left and right rim detection
+    const leftRegionStart = Math.floor(width * 0.2);
+    const leftRegionEnd = Math.floor(width * 0.4);
+    const rightRegionStart = Math.floor(width * 0.6);
+    const rightRegionEnd = Math.floor(width * 0.8);
+    
     // First pass: detect edges and potential liquid boundaries
     for (let y = 1; y < height - 1; y++) {
+        // Scan left region for left rim
+        for (let x = leftRegionStart; x < leftRegionEnd; x++) {
+            const idx = (y * width + x) * 4;
+            const idxAbove = ((y - 1) * width + x) * 4;
+            const idxBelow = ((y + 1) * width + x) * 4;
+            
+            // Calculate brightness values
+            const brightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+            const brightnessAbove = (imageData[idxAbove] + imageData[idxAbove + 1] + imageData[idxAbove + 2]) / 3;
+            const brightnessBelow = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
+            
+            const verticalEdge = Math.abs(brightness - brightnessAbove) + Math.abs(brightness - brightnessBelow);
+            const brightnessDiff = Math.abs(brightness - ((brightnessAbove + brightnessBelow) / 2));
+            
+            leftEdgeIntensity[y] += (verticalEdge > 30 || brightnessDiff > 20) ? 1 : 0;
+        }
+        
+        // Scan right region for right rim
+        for (let x = rightRegionStart; x < rightRegionEnd; x++) {
+            const idx = (y * width + x) * 4;
+            const idxAbove = ((y - 1) * width + x) * 4;
+            const idxBelow = ((y + 1) * width + x) * 4;
+            
+            const brightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+            const brightnessAbove = (imageData[idxAbove] + imageData[idxAbove + 1] + imageData[idxAbove + 2]) / 3;
+            const brightnessBelow = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
+            
+            const verticalEdge = Math.abs(brightness - brightnessAbove) + Math.abs(brightness - brightnessBelow);
+            const brightnessDiff = Math.abs(brightness - ((brightnessAbove + brightnessBelow) / 2));
+            
+            rightEdgeIntensity[y] += (verticalEdge > 30 || brightnessDiff > 20) ? 1 : 0;
+        }
+        
+        // Scan middle region for liquid level
         for (let x = startX; x < endX; x++) {
             const idx = (y * width + x) * 4;
             const idxAbove = ((y - 1) * width + x) * 4;
             const idxBelow = ((y + 1) * width + x) * 4;
             
-            // Get RGB values for current pixel and neighbors
-            const r = imageData[idx];
-            const g = imageData[idx + 1];
-            const b = imageData[idx + 2];
+            const brightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
+            const brightnessAbove = (imageData[idxAbove] + imageData[idxAbove + 1] + imageData[idxAbove + 2]) / 3;
+            const brightnessBelow = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
             
-            const rAbove = imageData[idxAbove];
-            const gAbove = imageData[idxAbove + 1];
-            const bAbove = imageData[idxAbove + 2];
-            
-            const rBelow = imageData[idxBelow];
-            const gBelow = imageData[idxBelow + 1];
-            const bBelow = imageData[idxBelow + 2];
-            
-            // Calculate brightness
-            const brightness = (r + g + b) / 3;
-            const brightnessAbove = (rAbove + gAbove + bAbove) / 3;
-            const brightnessBelow = (rBelow + gBelow + bBelow) / 3;
-            
-            // Enhanced edge detection for glass top
-            const verticalEdge = Math.abs(brightness - brightnessAbove) + 
-                               Math.abs(brightness - brightnessBelow);
-            
-            // Also look for brightness changes that might indicate glass edges
+            // For overall edge detection (used for bottom)
+            const verticalEdge = Math.abs(brightness - brightnessAbove) + Math.abs(brightness - brightnessBelow);
             const brightnessDiff = Math.abs(brightness - ((brightnessAbove + brightnessBelow) / 2));
-            
-            // Combine both types of edge detection
             edgeIntensityByRow[y] += (verticalEdge > 30 || brightnessDiff > 20) ? 1 : 0;
             
-            // Detect color/brightness transitions (liquid level)
+            // For liquid level detection
             const colorDiff = Math.abs(brightnessAbove - brightnessBelow);
             liquidTransitionByRow[y] += colorDiff > 20 ? 1 : 0;
         }
         
         // Normalize values
+        leftEdgeIntensity[y] /= (leftRegionEnd - leftRegionStart);
+        rightEdgeIntensity[y] /= (rightRegionEnd - rightRegionStart);
         edgeIntensityByRow[y] /= sampleWidth;
         liquidTransitionByRow[y] /= sampleWidth;
         debugData[y] = liquidTransitionByRow[y];
     }
     
-    // Find glass top using a more sophisticated approach
-    let glassTop = height * 0.25; // Default value
-    let topEdges = [];
+    // Find left and right rim positions
+    let leftRimTop = height * 0.25;
+    let rightRimTop = height * 0.25;
+    let leftTopEdges = [];
+    let rightTopEdges = [];
     
-    // First, find all significant edges in the top half
-    const minEdgeStrength = 0.15; // Minimum strength to consider as an edge
+    // Detect significant edges in the top half for both sides
+    const minEdgeStrength = 0.15;
     for (let y = Math.floor(height * 0.05); y < Math.floor(height * 0.5); y++) {
-        if (edgeIntensityByRow[y] > minEdgeStrength) {
-            topEdges.push({
+        if (leftEdgeIntensity[y] > minEdgeStrength) {
+            leftTopEdges.push({
                 position: y,
-                strength: edgeIntensityByRow[y]
+                strength: leftEdgeIntensity[y]
+            });
+        }
+        if (rightEdgeIntensity[y] > minEdgeStrength) {
+            rightTopEdges.push({
+                position: y,
+                strength: rightEdgeIntensity[y]
             });
         }
     }
     
-    // Sort edges by strength
-    topEdges.sort((a, b) => b.strength - a.strength);
+    // Sort edges by strength for both sides
+    leftTopEdges.sort((a, b) => b.strength - a.strength);
+    rightTopEdges.sort((a, b) => b.strength - a.strength);
     
-    // Find the highest strong edge
-    if (topEdges.length > 0) {
-        // Get the top 3 strongest edges
-        const strongEdges = topEdges.slice(0, 3);
-        // Use the highest position among the strong edges
-        glassTop = Math.min(...strongEdges.map(edge => edge.position));
+    // Find the highest strong edge for each side
+    if (leftTopEdges.length > 0) {
+        const strongLeftEdges = leftTopEdges.slice(0, 3);
+        leftRimTop = Math.min(...strongLeftEdges.map(edge => edge.position));
     }
+    
+    if (rightTopEdges.length > 0) {
+        const strongRightEdges = rightTopEdges.slice(0, 3);
+        rightRimTop = Math.min(...strongRightEdges.map(edge => edge.position));
+    }
+    
+    // Use the lower of the two rim positions as the glass top
+    const glassTop = Math.max(leftRimTop, rightRimTop);
     
     // Find glass bottom (keeping existing logic as it works well)
     let glassBottom = height * 0.75;
@@ -416,7 +475,9 @@ function analyzeBeerLevel(imageData, width, height) {
         debugData: debugData,
         glassTop: glassTop,
         glassBottom: glassBottom,
-        liquidLevel: liquidLevel
+        liquidLevel: liquidLevel,
+        leftRimTop: leftRimTop,
+        rightRimTop: rightRimTop
     };
 }
 
