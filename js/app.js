@@ -192,12 +192,21 @@ function captureAndAnalyze() {
 // Process image and calculate score
 async function processImage() {
     try {
+        // Ensure the video frame is drawn to the canvas
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
         // Get image data for analysis
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const data = imageData.data;
+        if (!imageData || !imageData.data) {
+            throw new Error('Failed to get image data from canvas');
+        }
         
         // Find the beer level using color analysis
-        const analysis = analyzeBeerLevel(data, canvas.width, canvas.height);
+        const analysis = analyzeBeerLevel(imageData.data, canvas.width, canvas.height);
+        if (!analysis) {
+            throw new Error('Failed to analyze beer level');
+        }
+        
         window.lastAnalysis = analysis; // Store for use in drawPercentageOverlay
         
         // Draw debug visualization with glass boundaries first
@@ -230,12 +239,13 @@ async function processImage() {
         // Finally update the score display
         displayResults(score);
         
-        // Hide capture button after first photo
-        captureBtn.style.display = 'none';
-        
     } catch (err) {
         console.error('Error processing image:', err);
-        alert('Error processing image. Please try again.');
+        // Reset analysis state
+        isAnalyzing = true;
+        requestAnimationFrame(analyzeFrame);
+        // Show error to user
+        alert('Error processing image. Please try again with better lighting and glass positioning.');
     }
 }
 
