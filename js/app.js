@@ -181,33 +181,30 @@ async function processImage() {
 
 // Function to draw debug visualization
 function drawDebugVisualization(debugData, glassTop, glassBottom, liquidLevel, leftRimTop, rightRimTop) {
-    // Draw both rim positions with full opacity
+    // Draw single rim line at the highest point
+    const highestRimPoint = Math.min(leftRimTop, rightRimTop);
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(0, 255, 255, 1)'; // Full opacity cyan
     ctx.lineWidth = 2;
     
-    // Front rim (lower)
-    ctx.moveTo(Math.floor(canvas.width * 0.2), Math.max(leftRimTop, rightRimTop));
-    ctx.lineTo(Math.floor(canvas.width * 0.8), Math.max(leftRimTop, rightRimTop));
-    
-    // Back rim (higher)
-    ctx.moveTo(Math.floor(canvas.width * 0.2), Math.min(leftRimTop, rightRimTop));
-    ctx.lineTo(Math.floor(canvas.width * 0.8), Math.min(leftRimTop, rightRimTop));
+    // Single rim line at highest point
+    ctx.moveTo(Math.floor(canvas.width * analysisRegions.left), highestRimPoint);
+    ctx.lineTo(Math.floor(canvas.width * analysisRegions.right), highestRimPoint);
     ctx.stroke();
     
     // Bottom line
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(0, 255, 255, 1)';
-    ctx.moveTo(Math.floor(canvas.width * 0.2), glassBottom);
-    ctx.lineTo(Math.floor(canvas.width * 0.8), glassBottom);
+    ctx.moveTo(Math.floor(canvas.width * analysisRegions.left), glassBottom);
+    ctx.lineTo(Math.floor(canvas.width * analysisRegions.right), glassBottom);
     ctx.stroke();
     
     // Draw liquid level line
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(255, 165, 0, 0.8)';
     ctx.lineWidth = 2;
-    ctx.moveTo(Math.floor(canvas.width * 0.2), liquidLevel);
-    ctx.lineTo(Math.floor(canvas.width * 0.8), liquidLevel);
+    ctx.moveTo(Math.floor(canvas.width * analysisRegions.left), liquidLevel);
+    ctx.lineTo(Math.floor(canvas.width * analysisRegions.right), liquidLevel);
     ctx.stroke();
     
     // Draw detection points
@@ -440,64 +437,8 @@ function analyzeBeerLevel(imageData, width, height) {
         rightRimTop = Math.min(...strongRightEdges.map(edge => edge.position));
     }
     
-    // Use the higher of the two rim positions as the back rim
-    const backRim = Math.min(leftRimTop, rightRimTop);
-    
-    // Now look for the front rim by scanning downward from the back rim
-    let leftFrontRim = backRim;
-    let rightFrontRim = backRim;
-    const maxRimDistance = height * 0.15; // Maximum expected distance between front and back rim
-    
-    // Scan for front rim (look for bright reflective edges)
-    for (let y = backRim + 5; y < backRim + maxRimDistance; y++) {
-        // Check left side
-        let leftBrightness = 0;
-        let leftEdgeStrength = 0;
-        for (let x = leftRegionStart; x < leftRegionEnd; x++) {
-            const idx = (y * width + x) * 4;
-            // Calculate brightness and look for bright spots (reflections)
-            const pixelBrightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
-            leftBrightness += pixelBrightness;
-            // Also check for edge strength
-            if (y < height - 1) {
-                const idxBelow = ((y + 1) * width + x) * 4;
-                const belowBrightness = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
-                leftEdgeStrength += Math.abs(pixelBrightness - belowBrightness);
-            }
-        }
-        leftBrightness /= (leftRegionEnd - leftRegionStart);
-        leftEdgeStrength /= (leftRegionEnd - leftRegionStart);
-        
-        // Check right side
-        let rightBrightness = 0;
-        let rightEdgeStrength = 0;
-        for (let x = rightRegionStart; x < rightRegionEnd; x++) {
-            const idx = (y * width + x) * 4;
-            const pixelBrightness = (imageData[idx] + imageData[idx + 1] + imageData[idx + 2]) / 3;
-            rightBrightness += pixelBrightness;
-            if (y < height - 1) {
-                const idxBelow = ((y + 1) * width + x) * 4;
-                const belowBrightness = (imageData[idxBelow] + imageData[idxBelow + 1] + imageData[idxBelow + 2]) / 3;
-                rightEdgeStrength += Math.abs(pixelBrightness - belowBrightness);
-            }
-        }
-        rightBrightness /= (rightRegionEnd - rightRegionStart);
-        rightEdgeStrength /= (rightRegionEnd - rightRegionStart);
-        
-        // Update front rim positions if we find a strong edge with high brightness
-        const brightnessThreshold = 150;
-        const edgeThreshold = 20;
-        
-        if (leftBrightness > brightnessThreshold && leftEdgeStrength > edgeThreshold) {
-            leftFrontRim = y;
-        }
-        if (rightBrightness > brightnessThreshold && rightEdgeStrength > edgeThreshold) {
-            rightFrontRim = y;
-        }
-    }
-    
-    // Use the lower of the two front rim positions as the glass top
-    const glassTop = Math.max(leftFrontRim, rightFrontRim);
+    // Use only the highest rim position
+    const glassTop = Math.min(leftRimTop, rightRimTop);
     
     // Find glass bottom (keeping existing logic as it works well)
     let glassBottom = height * 0.75;
@@ -594,14 +535,14 @@ function analyzeBeerLevel(imageData, width, height) {
     }
     
     // Calculate beer level as percentage from bottom
-    const glassHeight = glassBottom - Math.max(leftRimTop, rightRimTop);
+    const glassHeight = glassBottom - glassTop;
     const beerHeight = glassBottom - liquidLevel;
     const beerLevel = beerHeight / glassHeight;
     
     return {
         beerLevel: beerLevel,
         debugData: debugData,
-        glassTop: Math.max(leftRimTop, rightRimTop), // Use lower rim as glass top
+        glassTop: glassTop, // Use highest rim as glass top
         glassBottom: glassBottom,
         liquidLevel: liquidLevel,
         leftRimTop: leftRimTop,
