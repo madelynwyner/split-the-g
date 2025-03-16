@@ -149,11 +149,8 @@ async function processImage() {
         // Draw target line and G marker
         drawTargetLine();
         
-        // Calculate target position (67% up from bottom)
-        const glassHeight = analysis.glassBottom - analysis.glassTop;
-        const targetY = analysis.glassBottom - (glassHeight * 0.67);
-        
         // Calculate score based on how close liquid level is to G line
+        const targetY = Math.floor(canvas.height * analysisRegions.targetY);
         const score = calculateScore(analysis.liquidLevel, targetY);
         
         // Update percentages
@@ -552,12 +549,18 @@ function analyzeBeerLevel(imageData, width, height) {
 
 // Calculate score based on how close the liquid level is to target line
 function calculateScore(actualY, targetY) {
-    // Convert pixel difference to a percentage of glass height
+    // Calculate the pixel difference between liquid level and G line
     const pixelDifference = Math.abs(actualY - targetY);
-    const maxAllowedDifference = 50; // Maximum pixel difference for scoring
     
-    // Convert to a 0-100 score, with 100 being perfect
+    // Maximum allowed difference (in pixels) for scoring
+    // Smaller value = more strict scoring
+    const maxAllowedDifference = 30; // Adjusted to be more strict
+    
+    // Calculate score as percentage of accuracy
+    // The closer to the G line, the higher the score
     const score = Math.max(0, 100 - ((pixelDifference / maxAllowedDifference) * 100));
+    
+    // Round to nearest integer
     return Math.round(score);
 }
 
@@ -566,14 +569,16 @@ function displayResults(score) {
     scoreSpan.textContent = score.toFixed(2);
     
     let feedback;
-    if (score > 95) {
-        feedback = "Perfect split! You're a Guinness master! 🏆";
-    } else if (score > 85) {
-        feedback = "Very close! Almost perfect! 🎯";
-    } else if (score > 70) {
-        feedback = "Not bad, keep practicing! 🎯";
+    if (score >= 95) {
+        feedback = "Perfect G split! You're a Guinness master! 🏆";
+    } else if (score >= 85) {
+        feedback = "Excellent split! Almost perfect! 🎯";
+    } else if (score >= 70) {
+        feedback = "Good split! Keep practicing! 🎯";
+    } else if (score >= 50) {
+        feedback = "Getting there! Adjust to match the G line! 🎯";
     } else {
-        feedback = "Room for improvement - try again! 🎯";
+        feedback = "Try to get the liquid level closer to the G line! 🎯";
     }
     
     feedbackP.textContent = feedback;
