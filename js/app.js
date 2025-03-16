@@ -146,8 +146,9 @@ async function processImage() {
             analysis.rightRimTop
         );
         
-        // Calculate G line position - exactly 60% up from bottom
-        const targetY = Math.round(analysis.glassBottom - (analysis.glassBottom * 0.6));
+        // Calculate G line position - exactly at 60% of glass height from top
+        const glassHeight = analysis.glassBottom - analysis.glassTop;
+        const targetY = Math.round(analysis.glassTop + (glassHeight * 0.6));
         
         // Draw target line and G marker
         drawTargetLine(targetY);
@@ -282,12 +283,12 @@ function drawTargetLine(targetY) {
     // Draw line with slightly increased opacity
     ctx.beginPath();
     ctx.moveTo(Math.floor(canvas.width * analysisRegions.left), targetY);
-    ctx.lineTo(canvas.width - 60, targetY);
+    ctx.lineTo(Math.floor(canvas.width * analysisRegions.right), targetY);
     ctx.strokeStyle = 'rgba(224, 184, 119, 0.9)'; // #e0b877 with higher opacity
     ctx.lineWidth = 3; // Slightly thicker line
     ctx.stroke();
     
-    // Draw G marker with enhanced visibility
+    // Draw G marker in the middle with enhanced visibility
     ctx.font = 'bold 32px Arial'; // Larger, bolder font
     ctx.fillStyle = '#e0b877';
     // Add subtle shadow for better contrast
@@ -295,12 +296,18 @@ function drawTargetLine(targetY) {
     ctx.shadowBlur = 4;
     ctx.shadowOffsetX = 2;
     ctx.shadowOffsetY = 2;
-    ctx.fillText('G', canvas.width - 50, targetY - 8);
-    // Reset shadow
+    
+    // Calculate center position
+    const centerX = Math.floor(canvas.width * (analysisRegions.left + analysisRegions.right) / 2);
+    ctx.textAlign = 'center'; // Center the text
+    ctx.fillText('G', centerX, targetY - 8);
+    
+    // Reset shadow and text alignment
     ctx.shadowColor = 'transparent';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
+    ctx.textAlign = 'start';
 }
 
 // Analyze the beer level in the image
