@@ -122,9 +122,6 @@ async function processImage() {
         // Find the beer level using color analysis
         const { beerLevel, debugData } = analyzeBeerLevel(data, canvas.width, canvas.height);
         
-        // Draw target line and G marker
-        drawTargetLine();
-        
         // Calculate score based on how close to 3/4 the level is
         const targetLevel = 0.75; // 3/4 of the glass
         const score = calculateScore(beerLevel, targetLevel);
@@ -133,12 +130,70 @@ async function processImage() {
         const beerPercentage = Math.round(beerLevel * 100);
         const emptyPercentage = 100 - beerPercentage;
         
-        displayResults(score, beerLevel, beerPercentage, emptyPercentage);
+        // Draw target line and G marker first
+        drawTargetLine();
+        
+        // Then draw the percentage brackets and text
+        drawPercentageOverlay(beerPercentage, emptyPercentage);
+        
+        // Finally update the score display
+        displayResults(score);
         
     } catch (err) {
         console.error('Error processing image:', err);
         alert('Error processing image. Please try again.');
     }
+}
+
+// Function to draw brackets and percentages on the image
+function drawPercentageOverlay(beerPercentage, emptyPercentage) {
+    const targetY = canvas.height * 0.25; // 3/4 line position
+    
+    // Add semi-transparent background for better text visibility
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    
+    // Empty space bracket and percentage
+    ctx.beginPath();
+    ctx.strokeStyle = '#e74c3c'; // Red
+    ctx.lineWidth = 3;
+    // Left bracket
+    ctx.moveTo(10, 10);
+    ctx.lineTo(30, 10);
+    ctx.lineTo(30, targetY);
+    ctx.lineTo(10, targetY);
+    ctx.stroke();
+    
+    // Background for empty percentage
+    const emptyText = `${emptyPercentage}%`;
+    ctx.font = 'bold 24px Arial';
+    const emptyMetrics = ctx.measureText(emptyText);
+    const emptyY = targetY / 2;
+    ctx.fillRect(35, emptyY - 20, emptyMetrics.width + 10, 30);
+    
+    // Empty percentage text
+    ctx.fillStyle = '#e74c3c';
+    ctx.fillText(emptyText, 40, emptyY);
+    
+    // Beer space bracket and percentage
+    ctx.beginPath();
+    ctx.strokeStyle = '#2ecc71'; // Green
+    // Left bracket
+    ctx.moveTo(10, targetY);
+    ctx.lineTo(30, targetY);
+    ctx.lineTo(30, canvas.height - 10);
+    ctx.lineTo(10, canvas.height - 10);
+    ctx.stroke();
+    
+    // Background for beer percentage
+    const beerText = `${beerPercentage}%`;
+    const beerY = targetY + (canvas.height - targetY) / 2;
+    const beerMetrics = ctx.measureText(beerText);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.fillRect(35, beerY - 20, beerMetrics.width + 10, 30);
+    
+    // Beer percentage text
+    ctx.fillStyle = '#2ecc71';
+    ctx.fillText(beerText, 40, beerY);
 }
 
 // Draw target line and G marker
@@ -157,41 +212,6 @@ function drawTargetLine() {
     ctx.font = 'bold 24px Arial';
     ctx.fillStyle = '#e0b877';
     ctx.fillText('G', canvas.width - 40, targetY - 5);
-}
-
-// Function to draw brackets and percentages on the image
-function drawPercentageOverlay(beerPercentage, emptyPercentage) {
-    const targetY = canvas.height * 0.25; // 3/4 line position
-    
-    // Draw empty space bracket and percentage
-    ctx.beginPath();
-    ctx.strokeStyle = '#e74c3c'; // Red
-    ctx.lineWidth = 3;
-    // Left bracket
-    ctx.moveTo(10, 10);
-    ctx.lineTo(30, 10);
-    ctx.lineTo(30, targetY);
-    ctx.lineTo(10, targetY);
-    ctx.stroke();
-    
-    // Empty percentage text
-    ctx.font = 'bold 24px Arial';
-    ctx.fillStyle = '#e74c3c';
-    ctx.fillText(`${emptyPercentage}%`, 40, targetY / 2);
-    
-    // Draw beer space bracket and percentage
-    ctx.beginPath();
-    ctx.strokeStyle = '#2ecc71'; // Green
-    // Left bracket
-    ctx.moveTo(10, targetY);
-    ctx.lineTo(30, targetY);
-    ctx.lineTo(30, canvas.height - 10);
-    ctx.lineTo(10, canvas.height - 10);
-    ctx.stroke();
-    
-    // Beer percentage text
-    ctx.fillStyle = '#2ecc71';
-    ctx.fillText(`${beerPercentage}%`, 40, targetY + (canvas.height - targetY) / 2);
 }
 
 // Analyze the beer level in the image
@@ -252,14 +272,8 @@ function calculateScore(actualLevel, targetLevel) {
 }
 
 // Display results to user
-function displayResults(score, level, beerPercentage, emptyPercentage) {
+function displayResults(score) {
     scoreSpan.textContent = score.toFixed(2);
-    
-    // Draw the target line and G marker
-    drawTargetLine();
-    
-    // Draw the percentage brackets and text
-    drawPercentageOverlay(beerPercentage, emptyPercentage);
     
     let feedback;
     if (score > 95) {

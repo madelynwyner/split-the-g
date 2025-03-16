@@ -77,8 +77,8 @@ h1 {
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
-    width: 40%;
-    height: 90%;
+    width: 60%;
+    height: 80%;
     border: 3px solid var(--guide-color);
     border-radius: 2px;
 }
